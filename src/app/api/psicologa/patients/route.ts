@@ -1,4 +1,5 @@
-// Lista de pacientes únicos de la psicóloga. PII oculta (no phone, no email completo).
+// Lista de pacientes de la psicóloga. PII oculta (sin phone/email).
+// Incluye paquetes asignados a esta psi: fecha compra, fecha fin, sesiones used/restantes.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
@@ -12,6 +13,7 @@ const sb = createClient(
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 20;
 
 export async function GET(req: NextRequest) {
   const auth = await requirePsicologa(req);
@@ -21,8 +23,10 @@ export async function GET(req: NextRequest) {
   const ab = ameliaTable("appointments");
   const cb = ameliaTable("customer_bookings");
   const ub = ameliaTable("users");
+  const pc = ameliaTable("packages_to_customers");
+  const pcs = ameliaTable("packages_customers_to_services");
+  const pks = ameliaTable("packages");
 
-  // Customers con al menos 1 booking aprobada con esta psicóloga
   const rows = await ameliaQuery<any>(
     `SELECT DISTINCT cb.customerId,
        u.firstName, u.lastName,
@@ -39,9 +43,48 @@ export async function GET(req: NextRequest) {
     [provider_id, provider_id, provider_id, provider_id, provider_id],
   );
 
-  // Cuenta de notas clínicas escritas por esta psi para cada customer
   const custIds = rows.map((r: any) => Number(r.customerId)).filter(Boolean);
-  let notesCount = new Map<number, number>();
+  const packagesByCust = new Map<number, any[]>();
+
+  if (custIds.length > 0) {
+    const pkgRows = await ameliaQuery<any>(
+      `SELECT p.id package_customer_id, p.customerId, p.status, p.purchased, p.start, p.end,
+         pk.name package_name,
+         pcs.id pcs_id, pcs.bookingsCount total_bookings,
+         (SELECT COUNT(*) FROM ${cb} cb_u WHERE cb_u.packageCustomerServiceId = pcs.id AND cb_u.status IN ('approved','pending')) used_bookings
+       FROM ${pc} p
+       JOIN ${pcs} pcs ON pcs.packageCustomerId = p.id
+       JOIN ${pks} pk ON pk.id = p.packageId
+       WHERE p.customerId IN (${custIds.join(",")})
+         AND pcs.providerId = ?
+       ORDER BY p.purchased DESC`,
+      [provider_id],
+    );
+    for (const pr of pkgRows) {
+      const cid = Number(pr.customerId);
+      if (!packagesByCust.has(cid)) packagesByCust.set(cid, []);
+      const total = Number(pr.total_bookings ?? 0);
+      const used = Number(pr.used_bookings ?? 0);
+      const remaining = Math.max(0, total - used);
+      const expired = pr.end != null && new Date(pr.end) < new Date();
+      packagesByCust.get(cid)!.push({
+        package_customer_id: pr.package_customer_id,
+        pcs_id: pr.pcs_id,
+        package_name: pr.package_name,
+        status: pr.status,
+        purchased: pr.purchased ? new Date(pr.purchased).toISOString() : null,
+        start: pr.start ? new Date(pr.start).toISOString() : null,
+        end: pr.end ? new Date(pr.end).toISOString() : null,
+        total_bookings: total,
+        used_bookings: used,
+        remaining,
+        expired,
+        active: pr.status === "approved" && !expired && remaining > 0,
+      });
+    }
+  }
+
+  const notesCount = new Map<number, number>();
   if (custIds.length > 0) {
     const { data: notes } = await sb
       .from("psychologist_clinical_notes")
@@ -54,15 +97,31 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    patients: rows.map((r: any) => ({
-      customer_id: r.customerId,
-      // Nombre completo sí, pero NO email NI phone
-      name: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || "(sin nombre)",
-      total_sessions: Number(r.total_sessions ?? 0),
-      first_session: r.first_session ? new Date(r.first_session).toISOString() : null,
-      last_session: r.last_session ? new Date(r.last_session).toISOString() : null,
-      next_session: r.next_session ? new Date(r.next_session).toISOString() : null,
-      notes_count: notesCount.get(Number(r.customerId)) ?? 0,
-    })),
+    patients: rows.map((r: any) => {
+      const cid = Number(r.customerId);
+      const packages = packagesByCust.get(cid) ?? [];
+      const activePackage = packages.find((p) => p.active);
+      const totalRemaining = packages.reduce((s, p) => s + (p.active ? p.remaining : 0), 0);
+      return {
+        customer_id: cid,
+        name: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || "(sin nombre)",
+        total_sessions: Number(r.total_sessions ?? 0),
+        first_session: r.first_session ? new Date(r.first_session).toISOString() : null,
+        last_session: r.last_session ? new Date(r.last_session).toISOString() : null,
+        next_session: r.next_session ? new Date(r.next_session).toISOString() : null,
+        notes_count: notesCount.get(cid) ?? 0,
+        packages,
+        active_package: activePackage ? {
+          name: activePackage.package_name,
+          purchased: activePackage.purchased,
+          end: activePackage.end,
+          total_bookings: activePackage.total_bookings,
+          used_bookings: activePackage.used_bookings,
+          remaining: activePackage.remaining,
+        } : null,
+        total_remaining_sessions: totalRemaining,
+        has_any_package: packages.length > 0,
+      };
+    }),
   });
 }
