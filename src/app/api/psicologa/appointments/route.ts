@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
       booking_start_utc: new Date(r.bookingStart).toISOString(),
       booking_end_utc: r.bookingEnd ? new Date(r.bookingEnd).toISOString() : null,
       google_meet_url: r.googleMeetUrl || null,
+      service_id: r.serviceId,
       service_name: r.service_name,
       customer_id: r.customerId,
       // Nombre solo (sin phone/email)
