@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
-import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
+import { ameliaQuery, ameliaExec, ameliaTable } from "@/lib/amelia-db";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -118,5 +118,22 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const { error } = await sb.from("psychologist_clinical_notes").upsert(row, { onConflict: "appointment_id,provider_id" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+
+  // Sync attended → Amelia customer_bookings.status
+  // attended=false → 'no-show', attended=true → 'approved' (restaura por si estaba en otro)
+  let amelia_synced = false;
+  if (typeof body.attended === "boolean") {
+    const newStatus = body.attended ? "approved" : "no-show";
+    try {
+      const r = await ameliaExec(
+        `UPDATE ${ameliaTable("customer_bookings")} SET status = ? WHERE appointmentId = ? AND status NOT IN ('canceled','rejected')`,
+        [newStatus, apptId],
+      );
+      amelia_synced = r.affectedRows > 0;
+    } catch (e) {
+      console.warn("[psicologa] amelia sync fail:", (e as any)?.message);
+    }
+  }
+
+  return NextResponse.json({ ok: true, amelia_synced });
 }
