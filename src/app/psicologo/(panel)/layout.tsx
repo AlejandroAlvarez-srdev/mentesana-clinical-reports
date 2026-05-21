@@ -13,6 +13,7 @@ const nav = [
   { href: "/psicologo/citas", label: "Mis citas", emoji: "📅" },
   { href: "/psicologo/calendario", label: "Calendario", emoji: "🗓️" },
   { href: "/psicologo/pacientes", label: "Mis pacientes", emoji: "👥" },
+  { href: "/psicologo/acompana", label: "Acompaña", emoji: "🌿" },
   { href: "/psicologo/quejas", label: "Reportes al jefe", emoji: "💬" },
 ];
 

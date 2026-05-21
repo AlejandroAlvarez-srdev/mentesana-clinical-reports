@@ -5,6 +5,7 @@ import Link from "next/link";
 import AttendanceQuick from "../_components/AttendanceQuick";
 import WelcomeBanner from "../_components/WelcomeBanner";
 import MyTasks from "@/components/MyTasks";
+import PsiHomeContent from "../_components/PsiHomeContent";
 
 const PURPLE = "#6A178C";
 const DIAGNOSTICO_IDS = [8, 11];
@@ -59,6 +60,7 @@ export default function DashboardPage() {
       <WelcomeBanner firstName={firstName} todayCount={todayActive.length} diagnosticosToday={diagnosticosToday} nextAppt={nextAppt as any} />
 
       <MyTasks api="/api/psicologa/tasks" />
+      <PsiHomeContent />
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 22 }}>
         <Kpi label="📅 Hoy" value={today.length} color={PURPLE} />
