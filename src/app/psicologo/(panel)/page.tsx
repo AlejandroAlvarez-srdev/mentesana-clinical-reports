@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [today, setToday] = useState<Appt[]>([]);
   const [week, setWeek] = useState<Appt[]>([]);
   const [firstName, setFirstName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function DashboardPage() {
       setToday(t.appointments ?? []);
       setWeek(w.appointments ?? []);
       setFirstName(who.profile?.first_name ?? who.profile?.name?.split(" ")[0] ?? "");
+      setAvatarUrl(who.profile?.avatar_url ?? null);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -57,7 +59,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <WelcomeBanner firstName={firstName} todayCount={todayActive.length} diagnosticosToday={diagnosticosToday} nextAppt={nextAppt as any} />
+      <WelcomeBanner firstName={firstName} avatarUrl={avatarUrl} todayCount={todayActive.length} diagnosticosToday={diagnosticosToday} nextAppt={nextAppt as any} />
 
       <MyTasks api="/api/psicologa/tasks" />
       <PsiHomeContent />

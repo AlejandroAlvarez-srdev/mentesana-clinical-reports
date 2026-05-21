@@ -7,7 +7,7 @@ const DIAGNOSTICO_IDS = [8, 11]; // Sesion Individual 9,99
 
 type Appt = { appointment_id: number; service_id: number; booking_start_utc: string; customer_name: string; google_meet_url: string | null };
 
-export default function WelcomeBanner({ firstName, todayCount, diagnosticosToday, nextAppt }: { firstName: string; todayCount: number; diagnosticosToday: number; nextAppt: Appt | null }) {
+export default function WelcomeBanner({ firstName, avatarUrl, todayCount, diagnosticosToday, nextAppt }: { firstName: string; avatarUrl?: string | null; todayCount: number; diagnosticosToday: number; nextAppt: Appt | null }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), 60000);
@@ -33,14 +33,30 @@ export default function WelcomeBanner({ firstName, todayCount, diagnosticosToday
       <div style={{ position: "absolute", top: -60, right: -40, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(250,128,114,0.35) 0%, transparent 70%)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -50, left: "40%", width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,169,209,0.25) 0%, transparent 70%)", pointerEvents: "none" }} />
 
-      <div style={{ position: "relative", zIndex: 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", marginBottom: 6 }}>{fmtDate(now)}</div>
-        <h1 style={{ fontSize: "clamp(22px, 3.2vw, 32px)", fontWeight: 800, margin: 0, lineHeight: 1.12, letterSpacing: -0.6, color: "#fff" }}>
-          {greeting},{" "}
-          <span style={{ fontFamily: "Playfair Display, Georgia, serif", fontStyle: "italic", fontWeight: 600, background: "linear-gradient(90deg, #ffd9d3 0%, #fff 50%, #f9c9ee 100%)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            {firstName || "psicóloga"}
-          </span>
-        </h1>
+      <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}>
+        {/* Avatar redondito con halo dorado para que se sienta especial */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ position: "absolute", inset: -8, borderRadius: "50%", background: "conic-gradient(from 0deg, #FCD34D, #fff, #f9c9ee, #FCD34D)", filter: "blur(8px)", opacity: 0.6, animation: "spinHalo 8s linear infinite" }} />
+          <div style={{ position: "relative", width: 96, height: 96, borderRadius: "50%", overflow: "hidden", border: "3px solid rgba(255,255,255,0.9)", boxShadow: "0 8px 24px rgba(0,0,0,0.3), 0 0 0 4px rgba(252,211,77,0.3)" }}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={firstName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #fff, #f9c9ee)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 38, fontWeight: 900, color: PURPLE }}>
+                {(firstName?.[0] ?? "P").toUpperCase()}
+              </div>
+            )}
+          </div>
+          <style>{`@keyframes spinHalo { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        </div>
+
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase", color: "rgba(255,255,255,0.7)", marginBottom: 6 }}>{fmtDate(now)}</div>
+          <h1 style={{ fontSize: "clamp(22px, 3.2vw, 32px)", fontWeight: 800, margin: 0, lineHeight: 1.12, letterSpacing: -0.6, color: "#fff" }}>
+            {greeting},{" "}
+            <span style={{ fontFamily: "Playfair Display, Georgia, serif", fontStyle: "italic", fontWeight: 600, background: "linear-gradient(90deg, #ffd9d3 0%, #fff 50%, #f9c9ee 100%)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              {firstName || "psicóloga"}
+            </span>
+          </h1>
         <p style={{ margin: "12px 0 0", maxWidth: "62ch", fontSize: 15, color: "rgba(255,255,255,0.92)", lineHeight: 1.55, fontWeight: 500 }}>
           {headline}
         </p>
@@ -56,6 +72,7 @@ export default function WelcomeBanner({ firstName, todayCount, diagnosticosToday
         <p style={{ margin: "14px 0 0", fontSize: 19, fontStyle: "italic", color: "rgba(255,255,255,0.78)", fontFamily: "Caveat, cursive" }}>
           {cta}
         </p>
+        </div>
       </div>
     </section>
   );

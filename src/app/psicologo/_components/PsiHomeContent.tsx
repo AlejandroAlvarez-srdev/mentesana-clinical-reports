@@ -10,7 +10,8 @@ type Ann = { id: string; kind: string; title: string; body: string | null; image
 type Inspiration = {
   quote: { text: string; author: string | null; category: string | null } | null;
   blogs: { slug: string; title: string; subtitle: string | null; category: string | null; hero_image: string | null; publish_date: string | null; read_time: string | null; author: string | null; url: string }[];
-  shorts: { id: string; hook: string | null; video_url: string | null; image_url: string | null; brief: string | null }[];
+  episodes: { id: string; title: string; description: string; embed_url: string; watch_url: string; thumbnail_url: string }[];
+  shorts: { id: string; title: string; embed_url: string; watch_url: string; thumbnail_url: string }[];
 };
 
 const KIND_STYLE: Record<string, { color: string; label: string }> = {
@@ -119,16 +120,41 @@ export default function PsiHomeContent() {
         </section>
       )}
 
-      {/* Studio shorts (vídeos de Mente Sana) */}
+      {/* Episodios completos del podcast */}
+      {insp?.episodes && insp.episodes.length > 0 && (
+        <section style={{ marginBottom: 22 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 900, color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 0.5 }}>🎙️ El Podcast de Mente Sana</h3>
+            <a href="https://mentesanapsicologia.com/podcast" target="_blank" rel="noreferrer" style={{ fontSize: 11, color: PURPLE, textDecoration: "none", fontWeight: 700 }}>Ver podcast completo →</a>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+            {insp.episodes.map(ep => (
+              <article key={ep.id} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(0,0,0,0.06)" }}>
+                <div style={{ position: "relative", aspectRatio: "16/9", background: "#000" }}>
+                  <iframe src={ep.embed_url} title={ep.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen loading="lazy" />
+                </div>
+                <div style={{ padding: 12 }}>
+                  <strong style={{ fontSize: 13, lineHeight: 1.3, color: "#1a1a2e" }}>{ep.title}</strong>
+                  <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "#666", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{ep.description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Shorts del podcast (9:16, momentos destacados) */}
       {insp?.shorts && insp.shorts.length > 0 && (
         <section style={{ marginBottom: 22 }}>
-          <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 900, color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 0.5 }}>🎥 Shorts inspiradores Mente Sana</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-            {insp.shorts.slice(0, 4).map(s => (
-              <div key={s.id} style={{ background: "#000", borderRadius: 12, overflow: "hidden", aspectRatio: "9/16", maxHeight: 280, position: "relative" }}>
-                {s.video_url ? <video src={s.video_url} controls poster={s.image_url ?? undefined} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : s.image_url ? <img src={s.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
-                {s.hook && <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 8, background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent)", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: 1.3, maxHeight: 80, overflow: "hidden" }}>{s.hook.slice(0, 80)}</div>}
-              </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 900, color: "#1a1a2e", textTransform: "uppercase", letterSpacing: 0.5 }}>🎥 Shorts del podcast — momentos destacados</h3>
+            <a href="https://mentesanapsicologia.com/podcast#shorts" target="_blank" rel="noreferrer" style={{ fontSize: 11, color: PURPLE, textDecoration: "none", fontWeight: 700 }}>Ver todos →</a>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+            {insp.shorts.map(s => (
+              <article key={s.id} style={{ background: "#000", borderRadius: 12, overflow: "hidden", position: "relative", aspectRatio: "9/16" }}>
+                <iframe src={s.embed_url} title={s.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen loading="lazy" />
+              </article>
             ))}
           </div>
         </section>
