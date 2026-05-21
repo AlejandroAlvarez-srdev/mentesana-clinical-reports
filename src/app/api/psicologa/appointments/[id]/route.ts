@@ -103,6 +103,21 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const customer_id = own[0].customerId ? Number(own[0].customerId) : null;
   const session_date = own[0].bookingStart ? new Date(own[0].bookingStart).toISOString() : new Date().toISOString();
 
+  // Lock 7 días: HC solo editables 7 días tras la cita, salvo autorización del jefe.
+  const sessionTs = new Date(session_date).getTime();
+  const daysSince = (Date.now() - sessionTs) / 86400000;
+  if (daysSince > 7) {
+    const { data: unlock } = await sb.from("hc_unlock_requests").select("status").eq("appointment_id", apptId).maybeSingle();
+    if (!unlock || unlock.status !== "approved") {
+      return NextResponse.json({
+        error: "hc_locked",
+        message: "La cita tiene más de 7 días. Necesitas solicitar autorización al jefe de psicólogos para editar esta historia clínica.",
+        days_since_session: Math.floor(daysSince),
+        unlock_status: unlock?.status ?? "none",
+      }, { status: 423 }); // Locked
+    }
+  }
+
   // Upsert clinical note
   const row: any = {
     appointment_id: apptId,
