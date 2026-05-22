@@ -40,8 +40,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     updated_at: new Date().toISOString(),
   }, { onConflict: "appointment_id,provider_id" });
 
-  // Sync Amelia
+  // Sync Amelia — fuente de verdad para admin/CEO/customer 360. Si esto falla, los paneles
+  // de admin ven números distintos a los de la psicóloga, así que registramos cualquier fallo.
   let amelia_synced = false;
+  let amelia_error: string | null = null;
   if (attended !== null) {
     const newStatus = attended ? "approved" : "no-show";
     try {
@@ -50,7 +52,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         [newStatus, apptId],
       );
       amelia_synced = r.affectedRows > 0;
-    } catch { /* opcional */ }
+      if (!amelia_synced) {
+        amelia_error = "Amelia no actualizó ninguna fila (¿booking canceled/rejected?)";
+        console.warn("[attendance] sync skipped for appt", apptId, "— no rows affected (status was canceled/rejected?)");
+      }
+    } catch (e: any) {
+      amelia_error = String(e?.message ?? e).slice(0, 200);
+      console.error("[attendance] Amelia sync FAILED for appt", apptId, ":", amelia_error);
+    }
   }
-  return NextResponse.json({ ok: true, amelia_synced, attended });
+  return NextResponse.json({ ok: true, amelia_synced, amelia_error, attended });
 }

@@ -8,10 +8,12 @@ export default function AttendanceQuick({ appointmentId, initial, compact = fals
   const [val, setVal] = useState<boolean | null>(initial);
   const [saving, setSaving] = useState<"yes" | "no" | "null" | null>(null);
   const [synced, setSynced] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   async function set(next: boolean | null) {
     if (val === next) return;
     setSaving(next === true ? "yes" : next === false ? "no" : "null");
+    setSyncError(null);
     try {
       const r = await fetch(`/api/psicologa/appointments/${appointmentId}/attendance`, {
         method: "POST", credentials: "include",
@@ -21,7 +23,14 @@ export default function AttendanceQuick({ appointmentId, initial, compact = fals
       const d = await r.json();
       if (r.ok) {
         setVal(next);
-        if (d.amelia_synced) { setSynced(true); setTimeout(() => setSynced(false), 1500); }
+        if (d.amelia_synced) {
+          setSynced(true);
+          setTimeout(() => setSynced(false), 1500);
+        } else if (next !== null && d.amelia_error) {
+          // Sólo es relevante si la psicóloga marcó algo (no si vuelve a "pendiente").
+          // El admin/CEO leen de Amelia, así que sin sync los paneles divergen.
+          setSyncError(d.amelia_error);
+        }
         onChange?.(next);
       }
     } finally { setSaving(null); }
@@ -58,6 +67,12 @@ export default function AttendanceQuick({ appointmentId, initial, compact = fals
       {btn(val === false, "#dc2626", "✗ No asistió", false, "no")}
       {!compact && btn(val === null, "#888", "— pendiente", null, "null")}
       {synced && <span style={{ fontSize: 9.5, color: "#065f46", fontWeight: 800, marginLeft: 4 }}>✓ Amelia</span>}
+      {syncError && (
+        <span
+          title={`Sync con Amelia fallido: ${syncError}. El admin/CEO no verán este cambio hasta que se reintente. Reporta a soporte si persiste.`}
+          style={{ fontSize: 9.5, color: "#991b1b", fontWeight: 800, marginLeft: 4, padding: "1px 5px", background: "#fee2e2", borderRadius: 4, cursor: "help" }}
+        >⚠ Amelia no sync</span>
+      )}
     </div>
   );
 }

@@ -135,8 +135,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Sync attended → Amelia customer_bookings.status
-  // attended=false → 'no-show', attended=true → 'approved' (restaura por si estaba en otro)
+  // attended=false → 'no-show', attended=true → 'approved' (restaura por si estaba en otro).
+  // Si esto falla, admin/CEO ven números distintos a los de la psicóloga — devolvemos el error
+  // al cliente para que pueda avisar en pantalla en lugar de tragárselo.
   let amelia_synced = false;
+  let amelia_error: string | null = null;
   if (typeof body.attended === "boolean") {
     const newStatus = body.attended ? "approved" : "no-show";
     try {
@@ -145,10 +148,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         [newStatus, apptId],
       );
       amelia_synced = r.affectedRows > 0;
-    } catch (e) {
-      console.warn("[psicologa] amelia sync fail:", (e as any)?.message);
+      if (!amelia_synced) {
+        amelia_error = "Amelia no actualizó ninguna fila (¿booking canceled/rejected?)";
+        console.warn("[psicologa-appt-put] sync skipped for appt", apptId, "— no rows affected");
+      }
+    } catch (e: any) {
+      amelia_error = String(e?.message ?? e).slice(0, 200);
+      console.error("[psicologa-appt-put] Amelia sync FAILED for appt", apptId, ":", amelia_error);
     }
   }
 
-  return NextResponse.json({ ok: true, amelia_synced });
+  return NextResponse.json({ ok: true, amelia_synced, amelia_error });
 }
