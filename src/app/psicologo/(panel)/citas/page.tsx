@@ -66,7 +66,7 @@ export default function CitasPage() {
                       <AttendanceQuick appointmentId={a.appointment_id} initial={a.attended ?? null} compact />
                     )}
                     <Link href={`/psicologo/citas/${a.appointment_id}`} title={a.has_clinical_note ? "Ver/editar nota clínica" : "✍️ Escribir nota clínica"} style={{ fontSize: 11, padding: "5px 10px", background: a.has_clinical_note ? "rgba(16,185,129,0.14)" : "rgba(245,158,11,0.14)", color: a.has_clinical_note ? "#065f46" : "#92400e", borderRadius: 8, fontWeight: 800, textDecoration: "none", whiteSpace: "nowrap", border: a.has_clinical_note ? "1px solid rgba(16,185,129,0.3)" : "1px dashed rgba(245,158,11,0.4)" }}>
-                      {a.has_clinical_note ? "✓ Nota" : "✍️ + Nota"}
+                      {a.has_clinical_note ? "✓ HC" : "✍️ + HC"}
                     </Link>
                   </div>
                 </div>
