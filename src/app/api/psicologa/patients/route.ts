@@ -27,12 +27,13 @@ export async function GET(req: NextRequest) {
   const pcs = ameliaTable("packages_customers_to_services");
   const pks = ameliaTable("packages");
 
+  // Semántica Mente Sana: approved+pending=asistió, no-show+rejected=no asistió
   const rows = await ameliaQuery<any>(
     `SELECT DISTINCT cb.customerId,
        u.firstName, u.lastName,
-       (SELECT COUNT(*) FROM ${cb} cb2 JOIN ${ab} a2 ON a2.id=cb2.appointmentId WHERE cb2.customerId = cb.customerId AND a2.providerId = ? AND cb2.status='approved') total_sessions,
-       (SELECT MAX(a3.bookingStart) FROM ${cb} cb3 JOIN ${ab} a3 ON a3.id=cb3.appointmentId WHERE cb3.customerId = cb.customerId AND a3.providerId = ? AND cb3.status='approved') last_session,
-       (SELECT MIN(a4.bookingStart) FROM ${cb} cb4 JOIN ${ab} a4 ON a4.id=cb4.appointmentId WHERE cb4.customerId = cb.customerId AND a4.providerId = ? AND cb4.status='approved') first_session,
+       (SELECT COUNT(*) FROM ${cb} cb2 JOIN ${ab} a2 ON a2.id=cb2.appointmentId WHERE cb2.customerId = cb.customerId AND a2.providerId = ? AND cb2.status IN ('approved','pending')) total_sessions,
+       (SELECT MAX(a3.bookingStart) FROM ${cb} cb3 JOIN ${ab} a3 ON a3.id=cb3.appointmentId WHERE cb3.customerId = cb.customerId AND a3.providerId = ? AND cb3.status IN ('approved','pending')) last_session,
+       (SELECT MIN(a4.bookingStart) FROM ${cb} cb4 JOIN ${ab} a4 ON a4.id=cb4.appointmentId WHERE cb4.customerId = cb.customerId AND a4.providerId = ? AND cb4.status IN ('approved','pending')) first_session,
        (SELECT MIN(a5.bookingStart) FROM ${cb} cb5 JOIN ${ab} a5 ON a5.id=cb5.appointmentId WHERE cb5.customerId = cb.customerId AND a5.providerId = ? AND cb5.status IN ('approved','pending') AND a5.bookingStart >= NOW()) next_session
      FROM ${cb} cb
      JOIN ${ab} a ON a.id = cb.appointmentId

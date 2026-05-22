@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
   const ub = ameliaTable("users");
   const sv = ameliaTable("services");
 
+  // Semántica Mente Sana: approved+pending=asistió, no-show+rejected=no asistió, canceled=canceló
+  // Mostramos todos los status (excepto NULL/desconocidos) para que la psicóloga vea su histórico completo.
   const rows = await ameliaQuery<any>(
     `SELECT a.id appointment_id, a.bookingStart, a.bookingEnd, a.googleMeetUrl, a.serviceId, s.name service_name,
        cb.id booking_id, cb.customerId, cb.status booking_status,
@@ -43,7 +45,7 @@ export async function GET(req: NextRequest) {
      LEFT JOIN ${ub} cu ON cu.id = cb.customerId
      LEFT JOIN ${sv} s ON s.id = a.serviceId
      WHERE a.providerId = ?
-       AND (cb.status IS NULL OR cb.status IN ('approved','pending','canceled'))
+       AND (cb.status IS NULL OR cb.status IN ('approved','pending','canceled','no-show','rejected'))
        ${whereTime}
      ORDER BY a.bookingStart ${range === "past" ? "DESC" : "ASC"}
      LIMIT 200`,

@@ -51,7 +51,8 @@ export default function DashboardPage() {
 
   const todayActive = today.filter(a => a.booking_status !== "canceled");
   const diagnosticosToday = todayActive.filter(a => DIAGNOSTICO_IDS.includes(a.service_id)).length;
-  const pendingNotes = week.filter(a => !a.has_clinical_note && new Date(a.booking_start_utc) < new Date() && a.booking_status === "approved").length;
+  // Semántica Mente Sana: approved+pending=asistió (ambos generan obligación de rellenar HC)
+  const pendingNotes = week.filter(a => !a.has_clinical_note && new Date(a.booking_start_utc) < new Date() && (a.booking_status === "approved" || a.booking_status === "pending")).length;
   const nextAppt = todayActive
     .map(a => ({ ...a, _ts: new Date(a.booking_start_utc).getTime() }))
     .filter(a => a._ts > Date.now())
