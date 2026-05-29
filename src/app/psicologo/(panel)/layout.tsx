@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPsicologa } from "@/lib/psicologa-auth";
+import { isExtensionActive } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -14,6 +15,8 @@ const nav = [
   { href: "/psicologo/calendario", label: "Calendario", emoji: "🗓️" },
   { href: "/psicologo/pacientes", label: "Mis pacientes", emoji: "👥" },
   { href: "/psicologo/acompana", label: "Acompaña", emoji: "🌿" },
+  { href: "/psicologo/sesiones", label: "Sesiones", emoji: "🎙️" },
+  { href: "/psicologo/asistente", label: "Asistente", emoji: "🤖" },
   { href: "/psicologo/quejas", label: "Reportes al jefe", emoji: "💬" },
 ];
 
@@ -29,6 +32,7 @@ async function loadAvatar(providerId: number): Promise<string | null> {
 export default async function PsicologaLayout({ children }: { children: React.ReactNode }) {
   const p = await getPsicologa();
   if (!p) redirect("/psicologo/login");
+  if (!(await isExtensionActive(p.provider_id))) redirect("/psicologo/instalar-extension");
   const initials = (p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "");
   const avatar = await loadAvatar(p.provider_id);
 
