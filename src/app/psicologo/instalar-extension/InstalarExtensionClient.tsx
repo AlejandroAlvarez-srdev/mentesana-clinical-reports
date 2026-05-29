@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 const PURPLE = "#6A178C";
 const GOLD = "#C5A572";
 const codeStyle = { background: "#F3F4F6", padding: "2px 6px", borderRadius: 4, fontFamily: "monospace", fontSize: 12 } as const;
-const EXTENSION_URL = process.env.NEXT_PUBLIC_PSICOLOGA_EXTENSION_URL || "/extensions/mentesana-meet-ext.zip";
+// Servido desde Supabase Storage (igual que el APK) — más fiable que /public/ en Vercel y con CDN.
+const EXTENSION_URL = process.env.NEXT_PUBLIC_PSICOLOGA_EXTENSION_URL || "https://your-project.supabase.co/storage/v1/object/public/mentesana-app/mentesana-meet-ext.zip";
 
 export default function InstalarExtensionClient({ name }: { name: string }) {
   const [code, setCode] = useState<string | null>(null);
