@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 const PURPLE = "#6A178C";
 const GOLD = "#C5A572";
-const code = { background: "#F3F4F6", padding: "2px 6px", borderRadius: 4, fontFamily: "monospace", fontSize: 12 } as const;
+const codeStyle = { background: "#F3F4F6", padding: "2px 6px", borderRadius: 4, fontFamily: "monospace", fontSize: 12 } as const;
 const EXTENSION_URL = process.env.NEXT_PUBLIC_PSICOLOGA_EXTENSION_URL || "/extensions/mentesana-meet-ext.zip";
 
 export default function InstalarExtensionClient({ name }: { name: string }) {
@@ -58,7 +58,7 @@ export default function InstalarExtensionClient({ name }: { name: string }) {
           <>
             <ol style={{ paddingLeft: 22, color: "#334155", fontSize: 14, lineHeight: 1.7 }}>
               <li><b>Descarga el ZIP</b> con el botón de abajo y <b>descomprímelo</b> en una carpeta (botón derecho → "Extraer").</li>
-              <li>Abre Chrome y escribe en la barra de direcciones: <code style={code}>chrome://extensions</code></li>
+              <li>Abre Chrome y escribe en la barra de direcciones: <code style={codeStyle}>chrome://extensions</code></li>
               <li>Arriba a la derecha activa el <b>"Modo de desarrollador"</b>.</li>
               <li>Pulsa <b>"Cargar descomprimida"</b> y selecciona la carpeta que extrajiste.</li>
               <li>Fija la extensión a la barra (icono del puzzle 🧩 → chincheta) y haz click en su icono.</li>
