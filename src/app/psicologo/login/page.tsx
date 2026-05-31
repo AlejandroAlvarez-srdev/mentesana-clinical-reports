@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const PURPLE = "#6A178C";
 
@@ -10,6 +10,13 @@ export default function PsicologaLoginPage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [extLost, setExtLost] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("ext") === "lost") {
+      setExtLost(true);
+    }
+  }, []);
 
   async function requestOtp() {
     if (!email.trim()) return;
@@ -39,6 +46,11 @@ export default function PsicologaLoginPage() {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: PURPLE, margin: "0 0 4px" }}>Panel psicóloga</h1>
           <p style={{ fontSize: 13, color: "#666", margin: 0 }}>{step === "email" ? "Te enviaremos un código por email" : `Código enviado a ${email}`}</p>
         </div>
+        {extLost && (
+          <div style={{ padding: 12, background: "#fef3c7", color: "#78350f", borderRadius: 10, fontSize: 12.5, marginBottom: 12, lineHeight: 1.5, border: "1px solid #fcd34d" }}>
+            <strong>⚠️ Sesión cerrada por seguridad.</strong> No detectamos la extensión Mente Sana en tu navegador. Por favor, vuelve a instalarla / actívala y entra de nuevo.
+          </div>
+        )}
         {err && <div style={{ padding: 10, background: "#fef2f2", color: "#991b1b", borderRadius: 8, fontSize: 12, marginBottom: 12 }}>⚠️ {err}</div>}
         {step === "email" && (
           <>

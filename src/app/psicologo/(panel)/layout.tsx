@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getPsicologa } from "@/lib/psicologa-auth";
 import { isExtensionActive } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
+import ExtensionWatchdog from "../_components/ExtensionWatchdog";
 import NotificationBell from "@/components/NotificationBell";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,8 @@ export default async function PsicologaLayout({ children }: { children: React.Re
         </div>
       </header>
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>{children}</main>
+      {/* Polling cliente: si la extensión deja de hacer heartbeat, echa a la psicóloga al login. */}
+      <ExtensionWatchdog />
     </div>
   );
 }
