@@ -94,11 +94,6 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           <a href="/psicologo/elegir-psicologa" style={{ background: "rgba(255,255,255,0.18)", color: "#fff", padding: "4px 12px", borderRadius: 999, textDecoration: "none", fontWeight: 700, fontSize: 11.5 }}>Cambiar psicóloga →</a>
         </div>
       )}
-      {isMobile && !p.is_supervisor && (
-        <div style={{ background: "#FFFBEB", color: "#78350F", padding: "8px 16px", fontSize: 12, textAlign: "center", borderBottom: "1px solid #FCD34D" }}>
-          📱 Estás en móvil. Para grabar tus sesiones de Meet necesitas la extensión Chrome — entra desde el ordenador.
-        </div>
-      )}
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>{children}</main>
       {/* Polling cliente: si la extensión deja de hacer heartbeat, echa a la psicóloga al login.
           Solo aplica a la psi titular en escritorio. No corre para supervisora ni móvil. */}
