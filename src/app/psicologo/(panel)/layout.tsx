@@ -10,13 +10,15 @@ export const dynamic = "force-dynamic";
 
 const PURPLE = "#6A178C";
 
+// Nav del panel psicóloga. "Sesiones" (grabaciones de Meet) oculto desde
+// 2026-06-01 — la página /psicologo/sesiones sigue accesible por URL directa
+// pero ya no aparece en la barra para no llamar la atención al equipo.
 const nav = [
   { href: "/psicologo", label: "Inicio", emoji: "🏠" },
   { href: "/psicologo/citas", label: "Mis citas", emoji: "📅" },
   { href: "/psicologo/calendario", label: "Calendario", emoji: "🗓️" },
   { href: "/psicologo/pacientes", label: "Mis pacientes", emoji: "👥" },
   { href: "/psicologo/acompana", label: "Acompaña", emoji: "🌿" },
-  { href: "/psicologo/sesiones", label: "Sesiones", emoji: "🎙️" },
   { href: "/psicologo/asistente", label: "Asistente", emoji: "🤖" },
   { href: "/psicologo/quejas", label: "Reportes al jefe", emoji: "💬" },
 ];
