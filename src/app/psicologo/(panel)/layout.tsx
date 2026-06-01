@@ -1,10 +1,19 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { getPsicologa } from "@/lib/psicologa-auth";
 import { isExtensionActive } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
 import ExtensionWatchdog from "../_components/ExtensionWatchdog";
 import NotificationBell from "@/components/NotificationBell";
+
+// Detección server-side de móvil. La extensión solo existe en Chrome de
+// escritorio, así que en móvil ni la pedimos ni la chequeamos: la psi
+// puede entrar al panel a ver citas/pacientes/etc. sin fricción.
+function isMobileFromUA(ua: string | null): boolean {
+  if (!ua) return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+}
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +48,13 @@ export default async function PsicologaLayout({ children }: { children: React.Re
   if (p.is_supervisor && (!p.provider_id || p.provider_id <= 0)) {
     redirect("/psicologo/elegir-psicologa");
   }
-  // La extensión solo se exige a la psi titular, no a la supervisora
-  if (!p.is_supervisor && !(await isExtensionActive(p.provider_id))) {
+  const h = await headers();
+  const isMobile = isMobileFromUA(h.get("user-agent"));
+  // La extensión solo se exige a la psi titular en Chrome de escritorio.
+  // En móvil no existe extensión Chrome — la psi accede al panel para
+  // consultar citas/pacientes/chat, las sesiones de Meet las grabará
+  // cuando entre desde el ordenador.
+  if (!p.is_supervisor && !isMobile && !(await isExtensionActive(p.provider_id))) {
     redirect("/psicologo/instalar-extension");
   }
   const initials = (p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "");
@@ -80,10 +94,15 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           <a href="/psicologo/elegir-psicologa" style={{ background: "rgba(255,255,255,0.18)", color: "#fff", padding: "4px 12px", borderRadius: 999, textDecoration: "none", fontWeight: 700, fontSize: 11.5 }}>Cambiar psicóloga →</a>
         </div>
       )}
+      {isMobile && !p.is_supervisor && (
+        <div style={{ background: "#FFFBEB", color: "#78350F", padding: "8px 16px", fontSize: 12, textAlign: "center", borderBottom: "1px solid #FCD34D" }}>
+          📱 Estás en móvil. Para grabar tus sesiones de Meet necesitas la extensión Chrome — entra desde el ordenador.
+        </div>
+      )}
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>{children}</main>
       {/* Polling cliente: si la extensión deja de hacer heartbeat, echa a la psicóloga al login.
-          Solo aplica a la psi titular, no a la supervisora (que no tiene ext pareada). */}
-      {!p.is_supervisor && <ExtensionWatchdog />}
+          Solo aplica a la psi titular en escritorio. No corre para supervisora ni móvil. */}
+      {!p.is_supervisor && !isMobile && <ExtensionWatchdog />}
     </div>
   );
 }
