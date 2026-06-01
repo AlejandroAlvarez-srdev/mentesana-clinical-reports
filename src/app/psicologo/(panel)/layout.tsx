@@ -33,7 +33,14 @@ async function loadAvatar(providerId: number): Promise<string | null> {
 export default async function PsicologaLayout({ children }: { children: React.ReactNode }) {
   const p = await getPsicologa();
   if (!p) redirect("/psicologo/login");
-  if (!(await isExtensionActive(p.provider_id))) redirect("/psicologo/instalar-extension");
+  // Supervisora sin psi elegida → forzar selección
+  if (p.is_supervisor && (!p.provider_id || p.provider_id <= 0)) {
+    redirect("/psicologo/elegir-psicologa");
+  }
+  // La extensión solo se exige a la psi titular, no a la supervisora
+  if (!p.is_supervisor && !(await isExtensionActive(p.provider_id))) {
+    redirect("/psicologo/instalar-extension");
+  }
   const initials = (p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "");
   const avatar = await loadAvatar(p.provider_id);
 
@@ -65,9 +72,16 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           </div>
         </div>
       </header>
+      {p.is_supervisor && (
+        <div style={{ background: "linear-gradient(135deg, #6A178C, #8B2FB5)", color: "#fff", padding: "8px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
+          <span><strong style={{ color: "#D4AF37" }}>👁 Modo supervisora</strong> · Estás viendo el panel de <strong>{p.name}</strong></span>
+          <a href="/psicologo/elegir-psicologa" style={{ background: "rgba(255,255,255,0.18)", color: "#fff", padding: "4px 12px", borderRadius: 999, textDecoration: "none", fontWeight: 700, fontSize: 11.5 }}>Cambiar psicóloga →</a>
+        </div>
+      )}
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>{children}</main>
-      {/* Polling cliente: si la extensión deja de hacer heartbeat, echa a la psicóloga al login. */}
-      <ExtensionWatchdog />
+      {/* Polling cliente: si la extensión deja de hacer heartbeat, echa a la psicóloga al login.
+          Solo aplica a la psi titular, no a la supervisora (que no tiene ext pareada). */}
+      {!p.is_supervisor && <ExtensionWatchdog />}
     </div>
   );
 }

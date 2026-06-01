@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
-import { issuePsicologaSession, PSICOLOGA_COOKIE_NAME, psicologaCookieOptions } from "@/lib/psicologa-auth";
+import { issuePsicologaSession, PSICOLOGA_COOKIE_NAME, psicologaCookieOptions, type PsicologaProfile } from "@/lib/psicologa-auth";
+import { isJefeEmail } from "@/lib/jefe-psi-auth";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -30,14 +31,33 @@ export async function POST(req: NextRequest) {
   // OK — borra OTP usado
   await sb.from("psychologist_otp").delete().eq("email", email);
 
-  // Carga provider Amelia
+  // Líder → modo supervisor (sin provider_id, debe elegir a quién ver)
+  if (isJefeEmail(email)) {
+    const leaderName = email.startsWith("lidermentesana") ? "Lead B" : "Lead A";
+    const profile: PsicologaProfile = {
+      provider_id: 0,
+      email,
+      name: `${leaderName} (líder)`,
+      first_name: leaderName,
+      last_name: "(líder)",
+      is_supervisor: true,
+      original_email: email,
+    };
+    const { value, maxAge } = issuePsicologaSession(profile);
+    const res = NextResponse.json({ ok: true, profile, redirect: "/psicologo/elegir-psicologa" });
+    const opts = psicologaCookieOptions(maxAge);
+    res.cookies.set({ ...opts, value });
+    return res;
+  }
+
+  // Carga provider Amelia (psicóloga normal)
   const rows = await ameliaQuery<any>(
     `SELECT id, firstName, lastName, email FROM ${ameliaTable("users")} WHERE type='provider' AND status='visible' AND LOWER(email) = LOWER(?) LIMIT 1`,
     [email],
   );
   if (rows.length === 0) return NextResponse.json({ error: "provider_not_found" }, { status: 404 });
   const p = rows[0];
-  const profile = {
+  const profile: PsicologaProfile = {
     provider_id: Number(p.id),
     email: p.email,
     name: `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim() || p.email,

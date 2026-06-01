@@ -1,7 +1,10 @@
-// Envía OTP por email a la psicóloga si su email matchea un provider Amelia visible.
+// Envía OTP por email a:
+//   - una psicóloga (email matchea provider Amelia visible)
+//   - una líder del equipo (email en JEFE_EMAILS) → modo supervisor
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
+import { isJefeEmail } from "@/lib/jefe-psi-auth";
 import { sendEmail } from "@/lib/emails/send";
 import { emailLayout } from "@/lib/emails/layout";
 
@@ -21,15 +24,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid_email" }, { status: 400 });
   }
 
-  // Verifica que el email exista en Amelia como provider visible
-  const ub = ameliaTable("users");
-  const rows = await ameliaQuery<any>(
-    `SELECT id, firstName, lastName, email FROM ${ub} WHERE type='provider' AND status='visible' AND LOWER(email) = LOWER(?) LIMIT 1`,
-    [email],
-  );
-  if (rows.length === 0) {
-    // No revelamos si existe o no por seguridad
-    return NextResponse.json({ ok: true, message: "Si el email existe te enviamos un código." });
+  // Acepta si es líder (acceso supervisor) o provider Amelia visible
+  const isLeader = isJefeEmail(email);
+  let firstName = "";
+  if (!isLeader) {
+    const ub = ameliaTable("users");
+    const rows = await ameliaQuery<any>(
+      `SELECT id, firstName, lastName, email FROM ${ub} WHERE type='provider' AND status='visible' AND LOWER(email) = LOWER(?) LIMIT 1`,
+      [email],
+    );
+    if (rows.length === 0) {
+      // No revelamos si existe o no por seguridad
+      return NextResponse.json({ ok: true, message: "Si el email existe te enviamos un código." });
+    }
+    firstName = String(rows[0].firstName ?? "").trim();
+  } else {
+    // Identificamos a las líderes por su email (no tienen perfil Amelia).
+    firstName = email.startsWith("lidermentesana") ? "Lead B" : "Lead A";
   }
 
   // Genera OTP 6 dígitos
@@ -37,7 +48,6 @@ export async function POST(req: NextRequest) {
   const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   await sb.from("psychologist_otp").upsert({ email, code, expires_at: expires, attempts: 0, created_at: new Date().toISOString() }, { onConflict: "email" });
 
-  const firstName = String(rows[0].firstName ?? "").trim();
   const greeting = firstName ? `Hola ${firstName},` : "Hola,";
   const content = `
     <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#1a0a1f;">${greeting}</p>
@@ -52,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   await sendEmail({
     to: email,
-    toName: firstName || rows[0].lastName || "Psicóloga",
+    toName: firstName || (isLeader ? "Líder" : "Psicóloga"),
     subject: `Tu código: ${code}`,
     html,
   });
