@@ -9,15 +9,26 @@ import Link from "next/link";
 const PURPLE = "#6A178C";
 
 type Appt = { appointment_id: number; booking_start_utc: string; booking_end_utc: string | null; service_name: string | null; google_meet_url: string | null; customer_id: number; customer_name: string; booking_status: string };
-type Note = { highlights: string | null; how_went: string | null; patient_state: string | null; intervention: string | null; next_steps: string | null; homework: string | null; red_flags: string | null; attended: boolean | null; updated_at: string };
+type Note = { highlights: string | null; how_went: string | null; patient_state: string | null; intervention: string | null; next_steps: string | null; homework: string | null; red_flags: string | null; updated_at: string };
 type HistEntry = { appointment_id: number; session_date: string; highlights: string | null; how_went: string | null; attended: boolean | null };
+
+// Estado de asistencia derivado del booking_status de Amelia (fuente de verdad,
+// la marca el equipo de soporte). La psi NUNCA lo cambia desde su panel.
+type AttState = "approved" | "no_show" | "canceled" | "pending";
+function readAttendance(bookingStatus: string | null): AttState {
+  const s = (bookingStatus || "").toLowerCase();
+  if (s === "approved") return "approved";
+  if (s === "no-show" || s === "rejected") return "no_show";
+  if (s === "canceled" || s === "cancelled") return "canceled";
+  return "pending";
+}
 
 function fmt(iso: string) { return new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso)); }
 
 export default function CitaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [appt, setAppt] = useState<Appt | null>(null);
-  const [note, setNote] = useState<Note>({ highlights: "", how_went: "", patient_state: "", intervention: "", next_steps: "", homework: "", red_flags: "", attended: null, updated_at: "" });
+  const [note, setNote] = useState<Note>({ highlights: "", how_went: "", patient_state: "", intervention: "", next_steps: "", homework: "", red_flags: "", updated_at: "" });
   const [history, setHistory] = useState<HistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,29 +43,25 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
       const d = await r.json();
       setAppt(d.appointment);
       setHistory(d.history ?? []);
-      if (d.note) setNote({ highlights: d.note.highlights ?? "", how_went: d.note.how_went ?? "", patient_state: d.note.patient_state ?? "", intervention: d.note.intervention ?? "", next_steps: d.note.next_steps ?? "", homework: d.note.homework ?? "", red_flags: d.note.red_flags ?? "", attended: d.note.attended, updated_at: d.note.updated_at });
+      if (d.note) setNote({ highlights: d.note.highlights ?? "", how_went: d.note.how_went ?? "", patient_state: d.note.patient_state ?? "", intervention: d.note.intervention ?? "", next_steps: d.note.next_steps ?? "", homework: d.note.homework ?? "", red_flags: d.note.red_flags ?? "", updated_at: d.note.updated_at });
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, [id]);
 
-  async function quickSet(attended: boolean) {
-    // Sync rapido con Amelia sin esperar a Guardar
-    try {
-      await fetch(`/api/psicologa/appointments/${id}/attendance`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ attended }) });
-    } catch {}
-  }
-
   const [locked, setLocked] = useState<{ days: number; unlock_status: string } | null>(null);
+  const [attLockedMsg, setAttLockedMsg] = useState<string | null>(null);
   const [unlockReason, setUnlockReason] = useState("");
   const [requestingUnlock, setRequestingUnlock] = useState(false);
 
   async function save() {
-    setSaving(true); setSaved(false); setLocked(null);
+    setSaving(true); setSaved(false); setLocked(null); setAttLockedMsg(null);
     try {
       const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(note) });
       if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); return; }
-      if (r.status === 423) {
-        const d = await r.json();
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 423 && d.error === "attendance_not_confirmed") {
+        setAttLockedMsg(d.message ?? "Asistencia aún no confirmada.");
+      } else if (r.status === 423) {
         setLocked({ days: d.days_since_session ?? 0, unlock_status: d.unlock_status ?? "none" });
       }
     } finally { setSaving(false); }
@@ -136,28 +143,45 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
           {note.updated_at && <span style={{ fontSize: 10.5, color: "#888" }}>Guardado hace {fmtRel(note.updated_at)}</span>}
         </div>
 
-        <div style={{ marginBottom: 14, padding: 12, background: note.attended === null ? "rgba(245,158,11,0.06)" : note.attended === false ? "rgba(220,38,38,0.04)" : "rgba(16,185,129,0.04)", border: `1px ${note.attended === null ? "dashed" : "solid"} ${note.attended === null ? "rgba(245,158,11,0.4)" : note.attended === false ? "rgba(220,38,38,0.25)" : "rgba(16,185,129,0.25)"}`, borderRadius: 10 }}>
-          <label style={lbl}>🔑 Paso 1 · ¿Asistió el paciente?</label>
-          <div style={{ fontSize: 10.5, color: "#666", marginBottom: 8 }}>
-            {note.attended === null && "Marca asistencia primero para desbloquear historial + tareas."}
-            {note.attended === true && "✓ Genial, ya puedes rellenar el historial clínico y las tareas debajo."}
-            {note.attended === false && "Marcado como no-show en Amelia. El historial queda bloqueado (no hay sesión que registrar)."}
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <button onClick={() => { setNote({ ...note, attended: true }); void quickSet(true); }} style={pillBtn(note.attended === true, "#16a34a")}>✓ Sí, asistió</button>
-            <button onClick={() => { setNote({ ...note, attended: false }); void quickSet(false); }} style={pillBtn(note.attended === false, "#dc2626")}>✗ No asistió</button>
-            <button onClick={() => setNote({ ...note, attended: null })} style={pillBtn(note.attended === null, "#888")}>— pendiente</button>
-          </div>
-        </div>
+        {(() => {
+          const att = readAttendance(appt.booking_status);
+          const palette = att === "approved"
+            ? { bg: "rgba(16,185,129,0.06)", br: "rgba(16,185,129,0.3)", fg: "#065f46" }
+            : att === "no_show"
+            ? { bg: "rgba(220,38,38,0.05)", br: "rgba(220,38,38,0.3)", fg: "#991b1b" }
+            : att === "canceled"
+            ? { bg: "rgba(148,163,184,0.1)", br: "rgba(148,163,184,0.4)", fg: "#475569" }
+            : { bg: "rgba(245,158,11,0.06)", br: "rgba(245,158,11,0.4)", fg: "#92400e" };
+          return (
+            <div style={{ marginBottom: 14, padding: 12, background: palette.bg, border: `1px solid ${palette.br}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: palette.fg, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
+                {att === "approved" && "✓ Asistencia confirmada por soporte"}
+                {att === "pending" && "⏳ Esperando confirmación de asistencia"}
+                {att === "no_show" && "✗ Marcada como no-show por soporte"}
+                {att === "canceled" && "🚫 Cita cancelada"}
+              </div>
+              <div style={{ fontSize: 12, color: palette.fg, lineHeight: 1.5 }}>
+                {att === "approved" && "Ya puedes rellenar el historial clínico y las tareas debajo."}
+                {att === "pending" && "El historial y las tareas se desbloquean cuando el equipo de soporte confirme que el paciente asistió. La psicóloga no decide la asistencia."}
+                {att === "no_show" && "El historial queda bloqueado: no hay sesión que registrar. Si crees que es un error, escribe a soporte."}
+                {att === "canceled" && "No hay sesión que registrar."}
+              </div>
+            </div>
+          );
+        })()}
 
-        {note.attended === false && (
-          <div style={{ padding: 18, textAlign: "center", background: "rgba(220,38,38,0.04)", border: "1px dashed rgba(220,38,38,0.3)", borderRadius: 10, color: "#991b1b", fontSize: 13 }}>
-            🔒 Historial clínico bloqueado — el paciente no asistió a esta sesión.
-            <div style={{ fontSize: 11, marginTop: 4, color: "#7f1d1d" }}>Si te equivocaste, vuelve a marcar "Sí, asistió" arriba para desbloquear.</div>
+        {readAttendance(appt.booking_status) !== "approved" && (
+          <div style={{ padding: 18, textAlign: "center", background: "rgba(148,163,184,0.06)", border: "1px dashed rgba(148,163,184,0.4)", borderRadius: 10, color: "#475569", fontSize: 13 }}>
+            🔒 Historial clínico bloqueado
+            <div style={{ fontSize: 11, marginTop: 4, color: "#64748b" }}>
+              {readAttendance(appt.booking_status) === "pending"
+                ? "Soporte aún no ha confirmado la asistencia."
+                : "Solo se rellena cuando hubo sesión asistida."}
+            </div>
           </div>
         )}
 
-        {note.attended !== false && (
+        {readAttendance(appt.booking_status) === "approved" && (
         <>
         <Field label="✨ Highlights / lo más importante (1-2 frases que recordar)" hint="Para que en próximas sesiones recuerdes lo clave al instante">
           <textarea value={note.highlights ?? ""} onChange={e => setNote({ ...note, highlights: e.target.value })} rows={2} style={ta} placeholder="Ej: avance en límites con su madre; toca consolidar la próxima sesión" />
@@ -204,6 +228,11 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
             )}
           </div>
         )}
+        {attLockedMsg && (
+          <div style={{ marginTop: 14, padding: 12, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 10, color: "#92400e", fontSize: 12.5, lineHeight: 1.5 }}>
+            ⏳ {attLockedMsg}
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(0,0,0,0.06)" }}>
           {saved && <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 700 }}>✓ Guardado</span>}
           <button onClick={() => void save()} disabled={saving} style={{ marginLeft: "auto", padding: "10px 24px", background: `linear-gradient(135deg, ${PURPLE}, #8B2FB5)`, color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer", opacity: saving ? 0.5 : 1 }}>
@@ -214,17 +243,19 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
         )}
       </section>
 
-      {/* Tareas para el paciente — solo si asistió */}
+      {/* Tareas para el paciente — solo si asistencia confirmó */}
       <div id="tareas" style={{ marginBottom: 20, scrollMarginTop: 20 }}>
-        {note.attended === true ? (
+        {readAttendance(appt.booking_status) === "approved" ? (
           <PatientTasks customerId={appt.customer_id} appointmentId={appt.appointment_id} patientFirstName={appt.customer_name.split(" ")[0]} />
         ) : (
-          <section style={{ padding: 20, background: note.attended === null ? "rgba(245,158,11,0.04)" : "rgba(220,38,38,0.04)", border: `1px dashed ${note.attended === null ? "rgba(245,158,11,0.3)" : "rgba(220,38,38,0.25)"}`, borderRadius: 12, textAlign: "center" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: note.attended === null ? "#92400e" : "#991b1b", marginBottom: 4 }}>
+          <section style={{ padding: 20, background: "rgba(148,163,184,0.06)", border: "1px dashed rgba(148,163,184,0.4)", borderRadius: 12, textAlign: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 4 }}>
               🔒 Tareas paciente bloqueadas
             </div>
-            <p style={{ margin: 0, fontSize: 12, color: note.attended === null ? "#92400e" : "#7f1d1d", lineHeight: 1.5 }}>
-              {note.attended === null ? "Marca primero si el paciente asistió arriba 👆 para desbloquear las tareas." : "El paciente no asistió a esta sesión, así que no hay tareas que asignar."}
+            <p style={{ margin: 0, fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+              {readAttendance(appt.booking_status) === "pending"
+                ? "Las tareas se habilitan cuando soporte confirme la asistencia."
+                : "No hay tareas que asignar (sin sesión asistida)."}
             </p>
           </section>
         )}
@@ -257,10 +288,6 @@ function fmtRel(iso: string): string {
   const h = Math.floor(min / 60);
   if (h < 24) return `${h}h`;
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
-}
-
-function pillBtn(active: boolean, color: string): React.CSSProperties {
-  return { padding: "6px 12px", fontSize: 12, fontWeight: 700, borderRadius: 8, border: active ? `2px solid ${color}` : "1px solid rgba(0,0,0,0.1)", background: active ? color : "#fff", color: active ? "#fff" : "#475569", cursor: "pointer", fontFamily: "inherit" };
 }
 
 const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 };

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
-import { ameliaQuery, ameliaExec, ameliaTable } from "@/lib/amelia-db";
+import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -93,15 +93,30 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (!Number.isFinite(apptId)) return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   const body = await req.json().catch(() => ({}) as any);
 
-  // Verifica ownership
+  // Verifica ownership + lee asistencia canónica (Amelia)
   const own = await ameliaQuery<any>(
-    `SELECT a.bookingStart, cb.customerId FROM ${ameliaTable("appointments")} a LEFT JOIN ${ameliaTable("customer_bookings")} cb ON cb.appointmentId = a.id WHERE a.id = ? AND a.providerId = ? LIMIT 1`,
+    `SELECT a.bookingStart, cb.customerId, cb.status booking_status
+       FROM ${ameliaTable("appointments")} a
+       LEFT JOIN ${ameliaTable("customer_bookings")} cb ON cb.appointmentId = a.id
+      WHERE a.id = ? AND a.providerId = ? LIMIT 1`,
     [apptId, provider_id],
   );
   if (own.length === 0) return NextResponse.json({ error: "out_of_scope" }, { status: 403 });
 
   const customer_id = own[0].customerId ? Number(own[0].customerId) : null;
   const session_date = own[0].bookingStart ? new Date(own[0].bookingStart).toISOString() : new Date().toISOString();
+  const bookingStatus = String(own[0].booking_status || "").toLowerCase();
+
+  // Gate de asistencia: el HC solo se puede editar si asistencia/admin marcó
+  // 'approved'. Cualquier otro estado (pending, no-show, canceled, rejected)
+  // mantiene el HC bloqueado. La psi NO decide asistencia.
+  if (bookingStatus !== "approved") {
+    return NextResponse.json({
+      error: "attendance_not_confirmed",
+      message: "El historial clínico se desbloquea cuando el equipo de soporte marca la sesión como asistida.",
+      booking_status: bookingStatus || null,
+    }, { status: 423 });
+  }
 
   // Lock 7 días: HC solo editables 7 días tras la cita, salvo autorización del jefe.
   const sessionTs = new Date(session_date).getTime();
@@ -118,45 +133,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
   }
 
-  // Upsert clinical note
+  // Upsert clinical note (sin tocar 'attended' — fuente de verdad es Amelia
+  // vía endpoint de asistencia del equipo de soporte). Si el cliente manda
+  // 'attended' lo ignoramos silenciosamente.
   const row: any = {
     appointment_id: apptId,
     provider_id,
     customer_id,
     session_date,
+    attended: true, // gate ya verificó booking_status='approved'
     updated_at: new Date().toISOString(),
   };
   for (const f of ["highlights", "how_went", "patient_state", "intervention", "next_steps", "homework", "red_flags"] as const) {
     if (typeof body[f] === "string") row[f] = body[f].slice(0, 5000);
   }
-  if (typeof body.attended === "boolean") row.attended = body.attended;
 
   const { error } = await sb.from("psychologist_clinical_notes").upsert(row, { onConflict: "appointment_id,provider_id" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Sync attended → Amelia customer_bookings.status
-  // attended=false → 'no-show', attended=true → 'approved' (restaura por si estaba en otro).
-  // Si esto falla, admin/CEO ven números distintos a los de la psicóloga — devolvemos el error
-  // al cliente para que pueda avisar en pantalla en lugar de tragárselo.
-  let amelia_synced = false;
-  let amelia_error: string | null = null;
-  if (typeof body.attended === "boolean") {
-    const newStatus = body.attended ? "approved" : "no-show";
-    try {
-      const r = await ameliaExec(
-        `UPDATE ${ameliaTable("customer_bookings")} SET status = ? WHERE appointmentId = ? AND status NOT IN ('canceled','rejected')`,
-        [newStatus, apptId],
-      );
-      amelia_synced = r.affectedRows > 0;
-      if (!amelia_synced) {
-        amelia_error = "Amelia no actualizó ninguna fila (¿booking canceled/rejected?)";
-        console.warn("[psicologa-appt-put] sync skipped for appt", apptId, "— no rows affected");
-      }
-    } catch (e: any) {
-      amelia_error = String(e?.message ?? e).slice(0, 200);
-      console.error("[psicologa-appt-put] Amelia sync FAILED for appt", apptId, ":", amelia_error);
-    }
-  }
-
-  return NextResponse.json({ ok: true, amelia_synced, amelia_error });
+  return NextResponse.json({ ok: true });
 }
