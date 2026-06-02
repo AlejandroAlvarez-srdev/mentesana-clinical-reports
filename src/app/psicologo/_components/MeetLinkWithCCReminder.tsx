@@ -90,7 +90,7 @@ export default function MeetLinkWithCCReminder({ href, label = "📹 Meet", vari
             </div>
 
             <p style={{ margin: "0 0 14px", fontSize: 13.5, lineHeight: 1.55, color: "#475569" }}>
-              Necesitamos que estén activos para que tu asistente <strong>pueda prepararte el resumen</strong> de la sesión.
+              Necesitamos que estén activos para que tu asistente <strong>pueda prepararte el resumen</strong> de la sesión. <span style={{ color: "#16a34a" }}>Todo se anonimiza en tu navegador antes de salir.</span>
             </p>
 
             {/* Pasos visuales */}

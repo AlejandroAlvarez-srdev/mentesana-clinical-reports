@@ -62,7 +62,7 @@ export default function CCAlwaysOnBanner() {
           Siempre activa los subtítulos en <em style={{ color: GOLD, fontStyle: "normal" }}>Español</em> al abrir Meet
         </div>
         <div style={{ fontSize: 12, opacity: 0.88, marginTop: 3, lineHeight: 1.4 }}>
-          Necesario para que tu asistente <strong>te prepare el resumen</strong> de la sesión después.
+          Necesario para que tu asistente <strong>te prepare el resumen</strong> de la sesión. <span style={{ opacity: 0.85 }}>Todos los datos se anonimizan en tu navegador.</span>
         </div>
       </div>
       <button

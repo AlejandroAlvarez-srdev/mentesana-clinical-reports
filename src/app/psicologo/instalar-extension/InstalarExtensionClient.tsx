@@ -91,7 +91,7 @@ export default function InstalarExtensionClient({ name }: { name: string }) {
             </div>
 
             <div style={{ marginTop: 24, padding: 14, background: "#FFFBEB", border: `1px solid ${GOLD}`, borderRadius: 8, fontSize: 12, color: "#78350F" }}>
-              <b>¿Por qué es obligatoria?</b> La extensión es la pieza que conecta tu navegador con tu asistente Mente Sana en el panel. Sin ella el asistente no puede ayudarte después de cada sesión y, por seguridad, el panel queda bloqueado.
+              <b>¿Por qué es obligatoria?</b> La extensión es la pieza que conecta tu navegador con tu asistente Mente Sana en el panel. <b>Todos los datos se anonimizan en tu navegador antes de salir</b> (sin nombres, sin DNI, sin teléfonos) — nunca enviamos audio ni vídeo. Sin la extensión el asistente no puede ayudarte después de cada sesión y, por seguridad, el panel queda bloqueado.
             </div>
 
             <details style={{ marginTop: 16, fontSize: 11, color: "#94a3b8" }}>
