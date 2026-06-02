@@ -6,6 +6,8 @@ import AttendanceQuick from "../_components/AttendanceQuick";
 import WelcomeBanner from "../_components/WelcomeBanner";
 import MyTasks from "@/components/MyTasks";
 import PsiHomeContent from "../_components/PsiHomeContent";
+import MeetLinkWithCCReminder from "../_components/MeetLinkWithCCReminder";
+import CCAlwaysOnBanner from "../_components/CCAlwaysOnBanner";
 
 const PURPLE = "#6A178C";
 const DIAGNOSTICO_IDS = [8, 11];
@@ -60,6 +62,7 @@ export default function DashboardPage() {
 
   return (
     <div>
+      <CCAlwaysOnBanner />
       <WelcomeBanner firstName={firstName} avatarUrl={avatarUrl} todayCount={todayActive.length} diagnosticosToday={diagnosticosToday} nextAppt={nextAppt as any} />
 
       <MyTasks api="/api/psicologa/tasks" />
@@ -118,7 +121,7 @@ function ApptCard({ a, showDay = false }: { a: Appt; showDay?: boolean }) {
       </Link>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         {a.google_meet_url && (
-          <a href={a.google_meet_url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "7px 12px", background: "linear-gradient(135deg, #16a34a, #22c55e)", color: "#fff", borderRadius: 8, fontSize: 12, fontWeight: 800, textDecoration: "none", boxShadow: "0 2px 6px rgba(22,163,74,0.25)" }}>📹 Meet</a>
+          <MeetLinkWithCCReminder href={a.google_meet_url} />
         )}
         <AttendanceQuick appointmentId={a.appointment_id} initial={a.attended ?? null} compact />
         <Link href={`/psicologo/citas/${a.appointment_id}`} title={a.has_clinical_note ? "Ver/editar nota clínica" : "✍️ Escribir nota clínica"} style={{ fontSize: 11, padding: "5px 10px", background: a.has_clinical_note ? "rgba(16,185,129,0.14)" : "rgba(245,158,11,0.14)", color: a.has_clinical_note ? "#065f46" : "#92400e", borderRadius: 8, fontWeight: 800, textDecoration: "none", whiteSpace: "nowrap", border: a.has_clinical_note ? "1px solid rgba(16,185,129,0.3)" : "1px dashed rgba(245,158,11,0.4)" }}>

@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import PatientTasks from "../../../_components/PatientTasks";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
+import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder";
 import Link from "next/link";
 
 const PURPLE = "#6A178C";
@@ -85,9 +86,7 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
         <h1 style={{ margin: "6px 0 0", fontSize: 24, fontWeight: 800 }}>{appt.customer_name}</h1>
         <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>{appt.service_name ?? "Sesión"}{appt.booking_status === "canceled" && " · CANCELADA"}</div>
         {appt.google_meet_url && (
-          <a href={appt.google_meet_url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 14, padding: "12px 22px", background: "#fff", color: PURPLE, textDecoration: "none", borderRadius: 12, fontSize: 14, fontWeight: 800, boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
-            📹 Abrir Google Meet →
-          </a>
+          <MeetLinkWithCCReminder href={appt.google_meet_url} label="📹 Abrir Google Meet →" variant="pill-large" />
         )}
         {!appt.google_meet_url && appt.booking_status !== "canceled" && (
           <div style={{ display: "inline-block", marginTop: 14, padding: "8px 14px", background: "rgba(245,158,11,0.2)", color: "#fff", borderRadius: 10, fontSize: 12 }}>

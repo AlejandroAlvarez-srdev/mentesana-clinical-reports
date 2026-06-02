@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AttendanceQuick from "../../_components/AttendanceQuick";
+import MeetLinkWithCCReminder from "../../_components/MeetLinkWithCCReminder";
 
 const PURPLE = "#6A178C";
 type Appt = { appointment_id: number; booking_start_utc: string; customer_name: string; service_name: string | null; google_meet_url: string | null; has_clinical_note: boolean; attended: boolean | null; booking_status: string; clinical_highlights: string | null };
@@ -60,7 +61,7 @@ export default function CitasPage() {
                   </Link>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     {a.google_meet_url && (
-                      <a href={a.google_meet_url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 10px", background: "linear-gradient(135deg, #16a34a, #22c55e)", color: "#fff", borderRadius: 8, fontSize: 12, fontWeight: 800, textDecoration: "none", boxShadow: "0 2px 6px rgba(22,163,74,0.25)" }}>📹 Meet</a>
+                      <MeetLinkWithCCReminder href={a.google_meet_url} />
                     )}
                     {a.booking_status !== "canceled" && (
                       <AttendanceQuick appointmentId={a.appointment_id} initial={a.attended ?? null} compact />
