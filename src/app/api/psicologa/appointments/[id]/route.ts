@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
-import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
+import { ameliaQuery, ameliaExec, ameliaTable } from "@/lib/amelia-db";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (!Number.isFinite(apptId)) return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   const body = await req.json().catch(() => ({}) as any);
 
-  // Verifica ownership + lee asistencia canónica (Amelia)
+  // Verifica ownership
   const own = await ameliaQuery<any>(
     `SELECT a.bookingStart, cb.customerId, cb.status booking_status
        FROM ${ameliaTable("appointments")} a
@@ -105,22 +105,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const customer_id = own[0].customerId ? Number(own[0].customerId) : null;
   const session_date = own[0].bookingStart ? new Date(own[0].bookingStart).toISOString() : new Date().toISOString();
-  const bookingStatus = String(own[0].booking_status || "").toLowerCase();
 
-  // Gate 1 — asistencia: el HC solo se puede editar si asistencia/admin marcó
-  // 'approved'. Cualquier otro estado (pending, no-show, canceled, rejected)
-  // mantiene el HC bloqueado. La psi NO decide asistencia.
-  if (bookingStatus !== "approved") {
-    return NextResponse.json({
-      error: "attendance_not_confirmed",
-      message: "El historial clínico se desbloquea cuando el equipo de soporte marca la sesión como asistida.",
-      booking_status: bookingStatus || null,
-    }, { status: 423 });
-  }
+  // TRANSICIÓN 2026-06-02 → 2026-06-09: durante esta semana la psicóloga
+  // puede marcar asistencia desde el bloque HC (pills Sí/No). Tras el lunes
+  // 9 jun la fuente única vuelve a ser el equipo de soporte vía
+  // /api/agent/appointments/[id]/attendance, y se reactiva el gate de
+  // booking_status='approved' (ver feedback_hc_gates en memoria).
 
-  // Gate 2 — 7 días: si han pasado más de 7 días desde la cita, la psi necesita
-  // autorización de la jefa de psicólogas para tocar el HC. Mantiene el incentivo
-  // de redactar en caliente y deja un rastro de aprobación para auditar.
+  // Lock 7 días — jefa de psicólogas autoriza HC viejos.
   const sessionTs = new Date(session_date).getTime();
   const daysSince = (Date.now() - sessionTs) / 86400000;
   if (daysSince > 7) {
@@ -139,38 +131,39 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
   }
 
-  // Lock 7 días: HC solo editables 7 días tras la cita, salvo autorización del jefe.
-  const sessionTs = new Date(session_date).getTime();
-  const daysSince = (Date.now() - sessionTs) / 86400000;
-  if (daysSince > 7) {
-    const { data: unlock } = await sb.from("hc_unlock_requests").select("status").eq("appointment_id", apptId).maybeSingle();
-    if (!unlock || unlock.status !== "approved") {
-      return NextResponse.json({
-        error: "hc_locked",
-        message: "La cita tiene más de 7 días. Necesitas solicitar autorización al jefe de psicólogos para editar esta historia clínica.",
-        days_since_session: Math.floor(daysSince),
-        unlock_status: unlock?.status ?? "none",
-      }, { status: 423 }); // Locked
-    }
-  }
-
-  // Upsert clinical note (sin tocar 'attended' — fuente de verdad es Amelia
-  // vía endpoint de asistencia del equipo de soporte). Si el cliente manda
-  // 'attended' lo ignoramos silenciosamente.
+  // Upsert clinical note
   const row: any = {
     appointment_id: apptId,
     provider_id,
     customer_id,
     session_date,
-    attended: true, // gate ya verificó booking_status='approved'
     updated_at: new Date().toISOString(),
   };
   for (const f of ["highlights", "how_went", "patient_state", "intervention", "next_steps", "homework", "red_flags"] as const) {
     if (typeof body[f] === "string") row[f] = body[f].slice(0, 5000);
   }
+  if (typeof body.attended === "boolean") row.attended = body.attended;
 
   const { error } = await sb.from("psychologist_clinical_notes").upsert(row, { onConflict: "appointment_id,provider_id" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true });
+  // Sync attended → Amelia customer_bookings.status (semana transición).
+  let amelia_synced = false;
+  let amelia_error: string | null = null;
+  if (typeof body.attended === "boolean") {
+    const newStatus = body.attended ? "approved" : "no-show";
+    try {
+      const r = await ameliaExec(
+        `UPDATE ${ameliaTable("customer_bookings")} SET status = ? WHERE appointmentId = ? AND status NOT IN ('canceled','rejected')`,
+        [newStatus, apptId],
+      );
+      amelia_synced = r.affectedRows > 0;
+      if (!amelia_synced) amelia_error = "Amelia no actualizó (¿canceled/rejected?)";
+    } catch (e: any) {
+      amelia_error = String(e?.message ?? e).slice(0, 200);
+      console.error("[psicologa-appt-put] Amelia sync FAILED for appt", apptId, ":", amelia_error);
+    }
+  }
+
+  return NextResponse.json({ ok: true, amelia_synced, amelia_error });
 }
