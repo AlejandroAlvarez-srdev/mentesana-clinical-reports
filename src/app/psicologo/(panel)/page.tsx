@@ -8,6 +8,7 @@ import MyTasks from "@/components/MyTasks";
 import PsiHomeContent from "../_components/PsiHomeContent";
 import MeetLinkWithCCReminder from "../_components/MeetLinkWithCCReminder";
 import CCAlwaysOnBanner from "../_components/CCAlwaysOnBanner";
+import AnnouncementsBanner from "../_components/AnnouncementsBanner";
 
 const PURPLE = "#6A178C";
 const DIAGNOSTICO_IDS = [8, 11];
@@ -62,6 +63,7 @@ export default function DashboardPage() {
 
   return (
     <div>
+      <AnnouncementsBanner />
       <CCAlwaysOnBanner />
       <WelcomeBanner firstName={firstName} avatarUrl={avatarUrl} todayCount={todayActive.length} diagnosticosToday={diagnosticosToday} nextAppt={nextAppt as any} />
 
