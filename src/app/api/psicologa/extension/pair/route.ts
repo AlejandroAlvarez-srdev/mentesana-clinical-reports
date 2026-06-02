@@ -32,8 +32,17 @@ export async function POST(req: NextRequest) {
   const device_id = crypto.randomUUID();
   const token = issueDeviceToken(pair.provider_id, device_id);
 
-  // last_seen_at se setea a NOW() en el pair para que el primer load del
-  // panel pase el check isExtensionActive sin tener que esperar al
+  // Revoca cualquier fila anterior del mismo provider — si la psi
+  // reinstaló la ext, el device viejo NO debe seguir contando como
+  // activo aunque su último heartbeat sea reciente. Solo la fila más
+  // nueva vale.
+  await sb.from("psicologa_extensions")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("provider_id", pair.provider_id)
+    .is("revoked_at", null);
+
+  // last_seen_at se setea a NOW() en el insert para que el primer load
+  // del panel pase el check isExtensionActive sin tener que esperar al
   // primer heartbeat (que tarda hasta 60s). El heartbeat siguiente lo
   // refresca igual y a partir de ahí el sistema funciona normal.
   await sb.from("psicologa_extensions").insert({
