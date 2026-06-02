@@ -32,8 +32,13 @@ export async function POST(req: NextRequest) {
   const device_id = crypto.randomUUID();
   const token = issueDeviceToken(pair.provider_id, device_id);
 
+  // last_seen_at se setea a NOW() en el pair para que el primer load del
+  // panel pase el check isExtensionActive sin tener que esperar al
+  // primer heartbeat (que tarda hasta 60s). El heartbeat siguiente lo
+  // refresca igual y a partir de ahí el sistema funciona normal.
   await sb.from("psicologa_extensions").insert({
     provider_id: pair.provider_id, device_id, version, user_agent,
+    last_seen_at: new Date().toISOString(),
   });
   await sb.from("psicologa_extension_pairings").update({ consumed_at: new Date().toISOString() }).eq("code", code);
 

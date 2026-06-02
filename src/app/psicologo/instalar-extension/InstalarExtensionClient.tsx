@@ -28,13 +28,17 @@ export default function InstalarExtensionClient({ name }: { name: string }) {
 
   useEffect(() => { genCode(); }, []);
 
-  // Polling: si la extensión emparejó y empezó a heartbeat, recarga al panel.
+  // Polling: detectamos el emparejamiento por la creación de la fila en
+  // psicologa_extensions (paired=true), no por el primer heartbeat
+  // (active=true) que puede tardar hasta 60s. Apenas la psi pega el
+  // código en la extensión, el backend inserta la fila y este poll lo
+  // pilla en máximo 4s.
   useEffect(() => {
     pollRef.current = setInterval(async () => {
       try {
         const r = await fetch("/api/psicologa/extension/status", { cache: "no-store" });
-        const j = await r.json();
-        if (j.active) {
+        const j = (await r.json()) as { active?: boolean; paired?: boolean };
+        if (j.paired || j.active) {
           setDetected(true);
           if (pollRef.current) clearInterval(pollRef.current);
           setTimeout(() => { window.location.href = "/psicologo"; }, 1200);

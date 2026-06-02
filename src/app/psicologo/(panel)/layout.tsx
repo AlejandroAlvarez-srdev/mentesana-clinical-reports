@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getPsicologa } from "@/lib/psicologa-auth";
-import { hasPairedExtension } from "@/lib/psicologa-extension";
+import { isExtensionActive } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -49,12 +49,12 @@ export default async function PsicologaLayout({ children }: { children: React.Re
   }
   const h = await headers();
   const isMobile = isMobileFromUA(h.get("user-agent"));
-  // Gate de UNA VEZ: la psi tiene que parear la extensión una primera
-  // vez para acceder al panel. Después YA NO la echamos del CRM aunque
-  // la ext deje de hacer heartbeat (Chrome MV3 duerme los service
-  // workers, wifi flaky, etc — genera demasiados falsos positivos).
-  // El control de calidad de las grabaciones se hace por otro lado.
-  if (!p.is_supervisor && !isMobile && !(await hasPairedExtension(p.provider_id))) {
+  // Gate: la extensión tiene que estar activa (heartbeat en últimas 12h).
+  // No es polling — solo se valida una vez al cargar la página (SSR).
+  // 12h es generoso (cubre fines de semana fuera, throttling, noche)
+  // pero exige re-pareo cuando reinstala la ext: el device viejo se
+  // queda dormido y no la deja pasar hasta que pegue el código nuevo.
+  if (!p.is_supervisor && !isMobile && !(await isExtensionActive(p.provider_id))) {
     redirect("/psicologo/instalar-extension");
   }
   const initials = (p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "");
