@@ -45,7 +45,7 @@ export default function SesionesClient() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: PURPLE, marginBottom: 16 }}>Sesiones grabadas</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: PURPLE, marginBottom: 16 }}>Mis sesiones</h1>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button onClick={() => setTab("draft")} style={tabStyle(tab === "draft")}>Pendientes revisión</button>
         <button onClick={() => setTab("approved")} style={tabStyle(tab === "approved")}>Aprobadas (en RAG)</button>

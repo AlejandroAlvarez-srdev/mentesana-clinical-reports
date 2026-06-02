@@ -3,11 +3,9 @@
 // Botón "Meet" para el panel de la psicóloga que, ANTES de abrir el
 // link, muestra un modal recordándole activar los subtítulos en español.
 //
-// Por qué: la extensión Mente Sana captura la transcripción leyendo
-// del DOM los captions nativos de Meet. Si la psi olvida activar los
-// subtítulos, la sesión se guarda VACÍA y no podemos construir el
-// resumen clínico. Este recordatorio es el seguro barato que evita
-// perder sesiones por un olvido de 1 click.
+// Por qué: para que el asistente pueda preparar tu resumen tras la
+// sesión, los subtítulos en español tienen que estar activos en Meet.
+// Recordatorio en 1 click que evita el olvido más común.
 import { useState } from "react";
 
 const PURPLE = "#6A178C";
@@ -92,7 +90,7 @@ export default function MeetLinkWithCCReminder({ href, label = "📹 Meet", vari
             </div>
 
             <p style={{ margin: "0 0 14px", fontSize: 13.5, lineHeight: 1.55, color: "#475569" }}>
-              Si los subtítulos no están activos, la extensión <strong>no podrá guardar la sesión</strong> y perderás el resumen automático del informe.
+              Necesitamos que estén activos para que tu asistente <strong>pueda prepararte el resumen</strong> de la sesión.
             </p>
 
             {/* Pasos visuales */}

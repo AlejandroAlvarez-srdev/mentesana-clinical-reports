@@ -2,8 +2,8 @@
 
 // Banner persistente en la entrada del panel psicóloga recordando que
 // SIEMPRE debe activar los subtítulos en español en Meet antes de
-// empezar la sesión. Sin CC, la extensión no captura la transcripción
-// y se pierde el resumen automático.
+// empezar la sesión. Sin CC, el asistente no puede prepararte el
+// resumen del informe después.
 //
 // Diseño: tono cálido morado/oro, dismissable de forma persistente
 // (sessionStorage) — si la psi lo cierra en una visita reaparece la
@@ -62,7 +62,7 @@ export default function CCAlwaysOnBanner() {
           Siempre activa los subtítulos en <em style={{ color: GOLD, fontStyle: "normal" }}>Español</em> al abrir Meet
         </div>
         <div style={{ fontSize: 12, opacity: 0.88, marginTop: 3, lineHeight: 1.4 }}>
-          Sin <strong>CC</strong> activado, la extensión no captura la sesión y se pierde el resumen automático del informe.
+          Necesario para que tu asistente <strong>te prepare el resumen</strong> de la sesión después.
         </div>
       </div>
       <button

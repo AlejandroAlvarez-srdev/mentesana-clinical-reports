@@ -54,7 +54,7 @@ export default function InstalarExtensionClient({ name }: { name: string }) {
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <img src="/images/logo.webp" alt="Mente Sana" style={{ height: 32 }} />
           <h1 style={{ fontSize: 26, fontWeight: 800, color: PURPLE, marginTop: 16, marginBottom: 6 }}>Instala la extensión Mente Sana</h1>
-          <p style={{ color: "#64748B", fontSize: 14, margin: 0 }}>Hola {name} 👋 — para acceder a tu panel necesitas tener instalada la extensión que captura y resume tus sesiones de Google Meet.</p>
+          <p style={{ color: "#64748B", fontSize: 14, margin: 0 }}>Hola {name} 👋 — para acceder a tu panel necesitas instalar la extensión Mente Sana en tu navegador.</p>
         </div>
 
         {detected ? (
@@ -91,7 +91,7 @@ export default function InstalarExtensionClient({ name }: { name: string }) {
             </div>
 
             <div style={{ marginTop: 24, padding: 14, background: "#FFFBEB", border: `1px solid ${GOLD}`, borderRadius: 8, fontSize: 12, color: "#78350F" }}>
-              <b>¿Por qué es obligatoria?</b> La extensión transcribe tus sesiones de Meet, las anonimiza en tu navegador y genera un resumen clínico que TÚ revisas antes de aprobar. Sin ella el asistente RAG no funciona y, por seguridad, el panel queda bloqueado.
+              <b>¿Por qué es obligatoria?</b> La extensión es la pieza que conecta tu navegador con tu asistente Mente Sana en el panel. Sin ella el asistente no puede ayudarte después de cada sesión y, por seguridad, el panel queda bloqueado.
             </div>
 
             <details style={{ marginTop: 16, fontSize: 11, color: "#94a3b8" }}>
