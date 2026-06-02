@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getPsicologa } from "@/lib/psicologa-auth";
-import { isExtensionActive } from "@/lib/psicologa-extension";
+import { hasPairedExtension } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
-import ExtensionWatchdog from "../_components/ExtensionWatchdog";
 import NotificationBell from "@/components/NotificationBell";
 
 // Detección server-side de móvil. La extensión solo existe en Chrome de
@@ -50,11 +49,12 @@ export default async function PsicologaLayout({ children }: { children: React.Re
   }
   const h = await headers();
   const isMobile = isMobileFromUA(h.get("user-agent"));
-  // La extensión solo se exige a la psi titular en Chrome de escritorio.
-  // En móvil no existe extensión Chrome — la psi accede al panel para
-  // consultar citas/pacientes/chat, las sesiones de Meet las grabará
-  // cuando entre desde el ordenador.
-  if (!p.is_supervisor && !isMobile && !(await isExtensionActive(p.provider_id))) {
+  // Gate de UNA VEZ: la psi tiene que parear la extensión una primera
+  // vez para acceder al panel. Después YA NO la echamos del CRM aunque
+  // la ext deje de hacer heartbeat (Chrome MV3 duerme los service
+  // workers, wifi flaky, etc — genera demasiados falsos positivos).
+  // El control de calidad de las grabaciones se hace por otro lado.
+  if (!p.is_supervisor && !isMobile && !(await hasPairedExtension(p.provider_id))) {
     redirect("/psicologo/instalar-extension");
   }
   const initials = (p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "");
@@ -95,9 +95,10 @@ export default async function PsicologaLayout({ children }: { children: React.Re
         </div>
       )}
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>{children}</main>
-      {/* Polling cliente: si la extensión deja de hacer heartbeat, echa a la psicóloga al login.
-          Solo aplica a la psi titular en escritorio. No corre para supervisora ni móvil. */}
-      {!p.is_supervisor && !isMobile && <ExtensionWatchdog />}
+      {/* ExtensionWatchdog desactivado 2026-06-01 — generaba demasiados
+          falsos positivos echando psicólogas del CRM. Gate único en SSR
+          con hasPairedExtension() de arriba: una vez pareada, no se
+          revoca por desconexión transitoria. */}
     </div>
   );
 }
