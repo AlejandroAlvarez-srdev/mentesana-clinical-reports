@@ -107,7 +107,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const session_date = own[0].bookingStart ? new Date(own[0].bookingStart).toISOString() : new Date().toISOString();
   const bookingStatus = String(own[0].booking_status || "").toLowerCase();
 
-  // Gate de asistencia: el HC solo se puede editar si asistencia/admin marcó
+  // Gate 1 — asistencia: el HC solo se puede editar si asistencia/admin marcó
   // 'approved'. Cualquier otro estado (pending, no-show, canceled, rejected)
   // mantiene el HC bloqueado. La psi NO decide asistencia.
   if (bookingStatus !== "approved") {
@@ -116,6 +116,27 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       message: "El historial clínico se desbloquea cuando el equipo de soporte marca la sesión como asistida.",
       booking_status: bookingStatus || null,
     }, { status: 423 });
+  }
+
+  // Gate 2 — 7 días: si han pasado más de 7 días desde la cita, la psi necesita
+  // autorización de la jefa de psicólogas para tocar el HC. Mantiene el incentivo
+  // de redactar en caliente y deja un rastro de aprobación para auditar.
+  const sessionTs = new Date(session_date).getTime();
+  const daysSince = (Date.now() - sessionTs) / 86400000;
+  if (daysSince > 7) {
+    const { data: unlock } = await sb
+      .from("hc_unlock_requests")
+      .select("status")
+      .eq("appointment_id", apptId)
+      .maybeSingle();
+    if (!unlock || unlock.status !== "approved") {
+      return NextResponse.json({
+        error: "hc_locked",
+        message: "La cita tiene más de 7 días. Necesitas solicitar autorización a la jefa de psicólogas para editar esta historia clínica.",
+        days_since_session: Math.floor(daysSince),
+        unlock_status: unlock?.status ?? "none",
+      }, { status: 423 });
+    }
   }
 
   // Lock 7 días: HC solo editables 7 días tras la cita, salvo autorización del jefe.
