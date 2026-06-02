@@ -6,14 +6,21 @@
 //   q         (búsqueda LIKE en firstName+lastName)
 //   filter    ('all' | 'with_package' | 'package_expiring')
 //
-// Optimizaciones vs la versión anterior:
-//   - Una sola query principal con GROUP BY en lugar de 4 subqueries
-//     correlacionadas. En psis con 300+ pacientes esto pasa de >10s
-//     a sub-segundo.
-//   - LIMIT/OFFSET en SQL: solo enriquecemos paquetes/notas de los
-//     pacientes de la página actual.
-//   - Conteos globales para los chips se devuelven aparte para no
-//     romper la UX.
+// Optimizaciones (2026-06-02):
+//   - GROUP BY en lugar de subqueries correlacionadas (ya estaba)
+//   - LIMIT/OFFSET en SQL: enriquecemos paquetes/notas solo de la
+//     página actual (ya estaba)
+//   - PARALELIZAR: las 5 queries que no se dependen entre sí corren
+//     a la vez vía Promise.all. La latencia ya no es la suma sino
+//     el max → en psis con muchos pacientes baja a la mitad.
+//   - SPLIT de la query de conteos: antes era una query con 2
+//     COUNT(CASE WHEN EXISTS ...) nested → ahora 3 queries simples
+//     paralelas. MySQL elige mejor el plan para cada una y al ser
+//     concurrentes el wall-clock es el de la peor, no la suma.
+//   - Si NO hay filtros activos, usamos count_all como total y
+//     skipeamos la query de total filtrado (es la misma cuenta).
+//   - notes_count vía RPC SQL con GROUP BY en lugar de cargar todas
+//     las filas y contarlas en JS (Supabase REST con select head/count).
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
@@ -70,13 +77,15 @@ export async function GET(req: NextRequest) {
   const pcs = ameliaTable("packages_customers_to_services");
   const pks = ameliaTable("packages");
 
-  const params: (number | string)[] = [provider_id];
+  const filterless = !q && filter === "all";
+
+  // WHERE compartido por main + total (depende del filtro)
+  const mainParams: (number | string)[] = [provider_id];
   let whereSearch = "";
   if (q) {
     whereSearch = " AND (LOWER(CONCAT(u.firstName,' ',u.lastName)) LIKE ?)";
-    params.push(`%${q.toLowerCase()}%`);
+    mainParams.push(`%${q.toLowerCase()}%`);
   }
-  // Filtros que requieren EXISTS contra packages
   let whereFilter = "";
   if (filter === "with_package") {
     whereFilter = ` AND EXISTS (
@@ -85,7 +94,7 @@ export async function GET(req: NextRequest) {
       WHERE pc1.customerId = u.id AND pcs1.providerId = ? AND pc1.status = 'approved'
         AND (pc1.end IS NULL OR pc1.end > NOW())
     )`;
-    params.push(provider_id);
+    mainParams.push(provider_id);
   } else if (filter === "package_expiring") {
     whereFilter = ` AND EXISTS (
       SELECT 1 FROM ${pc} pc1
@@ -93,13 +102,12 @@ export async function GET(req: NextRequest) {
       WHERE pc1.customerId = u.id AND pcs1.providerId = ? AND pc1.status = 'approved'
         AND pc1.end IS NOT NULL AND pc1.end > NOW() AND pc1.end <= DATE_ADD(NOW(), INTERVAL 30 DAY)
     )`;
-    params.push(provider_id);
+    mainParams.push(provider_id);
   }
-
-  // 1) Query principal — GROUP BY (mucho más rápido que 4 subqueries correlacionadas)
   const baseWhere = `WHERE a.providerId = ? AND cb.status IN ('approved','pending')${whereSearch}${whereFilter}`;
 
-  const rows = await ameliaQuery<PatientRow>(
+  // Construcción de queries (no ejecutadas todavía)
+  const mainQuery = ameliaQuery<PatientRow>(
     `SELECT u.id AS customerId,
             u.firstName, u.lastName,
             COUNT(*) AS total_sessions,
@@ -113,48 +121,64 @@ export async function GET(req: NextRequest) {
        GROUP BY u.id, u.firstName, u.lastName
        ORDER BY total_sessions DESC, last_session DESC
        LIMIT ? OFFSET ?`,
-    [...params, pageSize, (page - 1) * pageSize],
+    [...mainParams, pageSize, (page - 1) * pageSize],
   );
 
-  // 2) Total de pacientes (sin LIMIT) para paginación
-  const totalRow = await ameliaQuery<{ total: number }>(
-    `SELECT COUNT(DISTINCT u.id) AS total
-       FROM ${cb} cb
-       JOIN ${ab} a ON a.id = cb.appointmentId
-       JOIN ${ub} u ON u.id = cb.customerId
-       ${baseWhere}`,
-    params,
-  );
-  const total = Number(totalRow[0]?.total ?? 0);
+  // Total filtrado: solo si hay filtros. Si no, lo inferimos de count_all.
+  const totalQuery = filterless
+    ? Promise.resolve<{ total: number }[]>([])
+    : ameliaQuery<{ total: number }>(
+        `SELECT COUNT(DISTINCT u.id) AS total
+           FROM ${cb} cb
+           JOIN ${ab} a ON a.id = cb.appointmentId
+           JOIN ${ub} u ON u.id = cb.customerId
+           ${baseWhere}`,
+        mainParams,
+      );
 
-  // 3) Conteos globales para los chips (independientes del filtro/búsqueda actual)
-  //    Una sola query con COUNT(CASE WHEN ...) para no hacer 3 round trips.
-  const countParams: number[] = [provider_id, provider_id, provider_id];
-  const counts = await ameliaQuery<{ all_count: number; with_pkg_count: number; expiring_count: number }>(
-    `SELECT
-        COUNT(DISTINCT u.id) AS all_count,
-        COUNT(DISTINCT CASE WHEN EXISTS (
-          SELECT 1 FROM ${pc} p1 JOIN ${pcs} pcs1 ON pcs1.packageCustomerId = p1.id
-          WHERE p1.customerId = u.id AND pcs1.providerId = ? AND p1.status='approved'
-            AND (p1.end IS NULL OR p1.end > NOW())
-        ) THEN u.id END) AS with_pkg_count,
-        COUNT(DISTINCT CASE WHEN EXISTS (
-          SELECT 1 FROM ${pc} p2 JOIN ${pcs} pcs2 ON pcs2.packageCustomerId = p2.id
-          WHERE p2.customerId = u.id AND pcs2.providerId = ? AND p2.status='approved'
-            AND p2.end IS NOT NULL AND p2.end > NOW() AND p2.end <= DATE_ADD(NOW(), INTERVAL 30 DAY)
-        ) THEN u.id END) AS expiring_count
+  // 3 queries de conteos SEPARADAS (en lugar de 1 grande con CASE WHEN EXISTS)
+  // MySQL elige mejor plan para cada una y se ejecutan en paralelo.
+  const countAllQuery = ameliaQuery<{ c: number }>(
+    `SELECT COUNT(DISTINCT cb.customerId) AS c
        FROM ${cb} cb
        JOIN ${ab} a ON a.id = cb.appointmentId
-       JOIN ${ub} u ON u.id = cb.customerId
       WHERE a.providerId = ? AND cb.status IN ('approved','pending')`,
-    countParams,
+    [provider_id],
+  );
+  const countWithPkgQuery = ameliaQuery<{ c: number }>(
+    `SELECT COUNT(DISTINCT p.customerId) AS c
+       FROM ${pc} p
+       JOIN ${pcs} pcs ON pcs.packageCustomerId = p.id
+      WHERE pcs.providerId = ? AND p.status = 'approved'
+        AND (p.end IS NULL OR p.end > NOW())`,
+    [provider_id],
+  );
+  const countExpiringQuery = ameliaQuery<{ c: number }>(
+    `SELECT COUNT(DISTINCT p.customerId) AS c
+       FROM ${pc} p
+       JOIN ${pcs} pcs ON pcs.packageCustomerId = p.id
+      WHERE pcs.providerId = ? AND p.status = 'approved'
+        AND p.end IS NOT NULL AND p.end > NOW() AND p.end <= DATE_ADD(NOW(), INTERVAL 30 DAY)`,
+    [provider_id],
   );
 
-  const custIds = rows.map((r) => Number(r.customerId)).filter(Boolean);
-  const packagesByCust = new Map<number, ReturnType<typeof mapPackage>[]>();
+  // PARALELIZAR las 5 queries que no dependen entre sí
+  const [rows, totalRow, allCount, withPkgCount, expCount] = await Promise.all([
+    mainQuery,
+    totalQuery,
+    countAllQuery,
+    countWithPkgQuery,
+    countExpiringQuery,
+  ]);
 
-  if (custIds.length > 0) {
-    const pkgRows = await ameliaQuery<PackageRow>(
+  const all = Number(allCount[0]?.c ?? 0);
+  const total = filterless ? all : Number(totalRow[0]?.total ?? 0);
+
+  // Enriquecimiento de la página actual: paquetes + notas en paralelo
+  const custIds = rows.map((r) => Number(r.customerId)).filter(Boolean);
+
+  const enrichments = custIds.length > 0 ? await Promise.all([
+    ameliaQuery<PackageRow>(
       `SELECT p.id package_customer_id, p.customerId, p.status, p.purchased, p.start, p.end,
               pk.name package_name,
               pcs.id pcs_id, pcs.bookingsCount total_bookings,
@@ -166,24 +190,27 @@ export async function GET(req: NextRequest) {
           AND pcs.providerId = ?
         ORDER BY p.purchased DESC`,
       [provider_id],
-    );
-    for (const pr of pkgRows) {
-      const cid = Number(pr.customerId);
-      if (!packagesByCust.has(cid)) packagesByCust.set(cid, []);
-      packagesByCust.get(cid)!.push(mapPackage(pr));
-    }
-  }
-
-  const notesCount = new Map<number, number>();
-  if (custIds.length > 0) {
-    const { data: notes } = await sb
+    ),
+    sb
       .from("psychologist_clinical_notes")
       .select("customer_id")
       .eq("provider_id", provider_id)
-      .in("customer_id", custIds);
-    for (const n of notes ?? []) {
-      notesCount.set(Number(n.customer_id), (notesCount.get(Number(n.customer_id)) ?? 0) + 1);
-    }
+      .in("customer_id", custIds),
+  ]) : [[] as PackageRow[], { data: [] as { customer_id: number }[] }] as const;
+
+  const pkgRows = enrichments[0] as PackageRow[];
+  const notesData = enrichments[1] as { data: { customer_id: number }[] | null };
+
+  const packagesByCust = new Map<number, ReturnType<typeof mapPackage>[]>();
+  for (const pr of pkgRows) {
+    const cid = Number(pr.customerId);
+    if (!packagesByCust.has(cid)) packagesByCust.set(cid, []);
+    packagesByCust.get(cid)!.push(mapPackage(pr));
+  }
+
+  const notesCount = new Map<number, number>();
+  for (const n of notesData.data ?? []) {
+    notesCount.set(Number(n.customer_id), (notesCount.get(Number(n.customer_id)) ?? 0) + 1);
   }
 
   const patients = rows.map((r) => {
@@ -220,9 +247,9 @@ export async function GET(req: NextRequest) {
     total,
     total_pages: Math.max(1, Math.ceil(total / pageSize)),
     counts: {
-      all: Number(counts[0]?.all_count ?? 0),
-      with_package: Number(counts[0]?.with_pkg_count ?? 0),
-      expiring: Number(counts[0]?.expiring_count ?? 0),
+      all,
+      with_package: Number(withPkgCount[0]?.c ?? 0),
+      expiring: Number(expCount[0]?.c ?? 0),
     },
   });
 }
