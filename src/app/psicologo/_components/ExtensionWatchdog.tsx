@@ -2,20 +2,26 @@
 
 // Watchdog que vigila la conexión con la extensión Chrome mientras la
 // psicóloga tiene el panel abierto. Si la ext deja de hacer heartbeat
-// (porque la desactivó, la borró, perdió conexión, etc.), tras dos
+// (porque la desactivó, la borró, perdió conexión, etc.), tras varios
 // checks fallidos consecutivos cierra sesión y redirige a /login para
 // que tenga que volver a parear.
 //
-// Reglas de diseño:
-// - Polling cada 25 s (el servidor considera inactiva tras ~120 s).
-// - Margen de 1 fallo (network glitch); kicked al 2º fallo.
-// - Se pausa cuando la pestaña no está visible para no agotar la batería,
-//   y se ejecuta de inmediato cuando vuelve a estar visible.
-// - SSR-safe: no hace nada en server, todo en useEffect.
+// Reglas (afinadas 2026-06-01 tras falsos positivos):
+// - Polling cada 60 s (antes 25s · era demasiado agresivo).
+// - Solo cuenta como fallo cuando el servidor responde EXPLÍCITAMENTE
+//   active=false. Errores de red (wifi inestable, fetch abortado) NO
+//   incrementan el contador — la psi puede estar en una llamada y tener
+//   blips momentáneos sin que la echemos.
+// - 5 fallos consecutivos servidor=inactive antes de echar (~5 min).
+// - Se pausa cuando la pestaña no está visible o cuando el navegador
+//   reporta offline; reanuda en cuanto vuelve.
+// - Total tiempo desde 'extensión OFF' hasta logout: ~5 min (ventana
+//   server) + 5 polls × 60s = ~10 min máximo. Margen suficiente para
+//   no falsos positivos pero rápido para detectar desinstalación real.
 import { useEffect, useRef } from "react";
 
-const POLL_INTERVAL_MS = 25_000;
-const MAX_FAILS_BEFORE_KICK = 2;
+const POLL_INTERVAL_MS = 60_000;
+const MAX_FAILS_BEFORE_KICK = 5;
 
 export default function ExtensionWatchdog() {
   const failsRef = useRef(0);
@@ -37,33 +43,38 @@ export default function ExtensionWatchdog() {
       } catch {
         /* ignoramos el fallo de logout — vamos a redirect igualmente */
       }
-      // hash para que la pantalla siguiente sepa por qué la echamos
       window.location.replace("/psicologo/login?ext=lost");
     }
 
     async function check() {
       if (cancelled || kickedRef.current) return;
+      // Si el navegador reporta offline, no penalizamos al usuario.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
       try {
         const r = await fetch("/api/psicologa/extension/status", {
           credentials: "include",
           cache: "no-store",
         });
         if (r.status === 401) {
-          // Ya no hay sesión: mandamos directamente al login
           window.location.replace("/psicologo/login");
           return;
         }
+        if (!r.ok) {
+          // Errores 5xx u otros del servidor: no penalizamos al usuario.
+          return;
+        }
         const data = (await r.json().catch(() => null)) as { active?: boolean } | null;
-        if (data?.active) {
+        if (data === null) return; // respuesta no parseable, no penaliza
+        if (data.active) {
           failsRef.current = 0;
           return;
         }
         failsRef.current += 1;
         if (failsRef.current >= MAX_FAILS_BEFORE_KICK) await kick();
       } catch {
-        // Sin red: NO contamos como fallo definitivo, pero sí incrementamos.
-        failsRef.current += 1;
-        if (failsRef.current >= MAX_FAILS_BEFORE_KICK + 1) await kick();
+        // Network glitch puro (fetch lanza). NO incrementa contador para
+        // que un wifi inestable durante una llamada no eche a la psi.
+        return;
       }
     }
 
@@ -85,16 +96,22 @@ export default function ExtensionWatchdog() {
         stop();
       }
     }
+    function onOnline() {
+      // Cuando vuelve la red, reseteamos el contador y arrancamos un check.
+      failsRef.current = 0;
+      void check();
+    }
 
-    // Arranque
     void check();
     schedule();
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", onOnline);
 
     return () => {
       cancelled = true;
       stop();
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("online", onOnline);
     };
   }, []);
 
