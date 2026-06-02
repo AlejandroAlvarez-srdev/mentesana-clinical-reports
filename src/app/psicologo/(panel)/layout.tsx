@@ -61,7 +61,7 @@ export default async function PsicologaLayout({ children }: { children: React.Re
   const avatar = await loadAvatar(p.provider_id);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFAF2", fontFamily: "Inter, sans-serif" }}>
+    <div data-panel-psi style={{ minHeight: "100vh", background: "#FFFAF2", fontFamily: "Inter, sans-serif" }}>
       <header style={{ background: "#fff", borderBottom: "1px solid rgba(0,0,0,0.06)", padding: "12px 20px", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <Link href="/psicologo" style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}>

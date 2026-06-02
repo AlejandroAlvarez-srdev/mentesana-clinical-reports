@@ -107,7 +107,7 @@ export default function PacientesPage() {
         </div>
       </header>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="ms-chip-row" style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
         <FilterChip active={filter === "all"} onClick={() => { setFilter("all"); setPage(1); }}>Todos ({counts.all})</FilterChip>
         <FilterChip active={filter === "with_package"} onClick={() => { setFilter("with_package"); setPage(1); }} color="#16a34a">🎫 Con bono activo ({counts.with_package})</FilterChip>
         <FilterChip active={filter === "package_expiring"} onClick={() => { setFilter("package_expiring"); setPage(1); }} color="#d97706">⏳ Bono caduca pronto ({counts.expiring})</FilterChip>
@@ -128,8 +128,8 @@ export default function PacientesPage() {
       {!loading && patients.length === 0 && <div style={{ padding: 30, background: "#fff", borderRadius: 12, textAlign: "center", color: "#aaa" }}>Sin pacientes para este filtro.</div>}
 
       {!loading && patients.length > 0 && view === "table" && (
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)", overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+        <div className="ms-table-scroll" style={{ background: "#fff", borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 720 }}>
             <thead>
               <tr style={{ background: "rgba(106,23,140,0.05)" }}>
                 <Th>Paciente</Th>
