@@ -3,7 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requirePsicologa } from "@/lib/psicologa-auth";
-import { psyBlogSb, BLOG_TABLE, contentHash, publishIdempotencyKey, generateBlogHero, buildHeroPrompt } from "@/lib/psy-blog";
+import { psyBlogSb, BLOG_TABLE, contentHash, publishIdempotencyKey, generateBlogHero, buildHeroPrompt, mdToContentBlocks } from "@/lib/psy-blog";
+import { polishBlogMarkdown } from "@/lib/blog-polish";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,11 +63,22 @@ export async function POST(req: NextRequest) {
     heroError = (e as Error).message.slice(0, 240);
   }
 
+  // Polish del body_md: añade estructura markdown (## ### - > **) sin tocar palabras.
+  // Best-effort: si falla, publica tal cual.
+  let polishedBody = post.body_md ?? "";
+  try {
+    const polished = await polishBlogMarkdown(polishedBody);
+    if (polished && polished !== polishedBody) polishedBody = polished;
+  } catch (e) { console.warn("[publish] polish failed:", (e as Error).message); }
+  const polishedBlocks = mdToContentBlocks(polishedBody);
+
   const final = await sb
     .from(BLOG_TABLE)
     .update({
       status: "published",
       publish_date: new Date().toISOString(),
+      body_md: polishedBody,
+      content: polishedBlocks,
       hero_image: heroUrl,
       og_image: heroUrl,
       hero_image_alt: post.title,
