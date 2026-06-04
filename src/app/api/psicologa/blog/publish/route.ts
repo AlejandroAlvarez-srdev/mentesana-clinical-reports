@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requirePsicologa } from "@/lib/psicologa-auth";
-import { psyBlogSb, BLOG_TABLE, contentHash, publishIdempotencyKey, generateBlogHero, buildHeroPrompt, mdToContentBlocks } from "@/lib/psy-blog";
+import { psyBlogSb, BLOG_TABLE, contentHash, publishIdempotencyKey, generateBlogHero, buildHeroPrompt, buildHeroSceneFromTitle, mdToContentBlocks } from "@/lib/psy-blog";
 import { polishBlogMarkdown } from "@/lib/blog-polish";
 
 export const runtime = "nodejs";
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       content_hash: cHash,
       publish_idempotency_key: idemKey,
       hero_status: "generating",
-      hero_prompt: buildHeroPrompt(post.title),
+      hero_prompt: null,
       publish_attempts: (post.publish_attempts ?? 0) + 1,
     })
     .eq("id", postId)
@@ -55,10 +55,16 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!lockRes.data) return NextResponse.json({ error: "lock_failed_concurrent_state", current_status: post.status }, { status: 409 });
 
+  // Genera ESCENA cinematográfica concreta a partir del título (Claude) →
+  // luego envuelve con prompt técnico/prohibiciones → Higgsfield. Así cada
+  // post tiene una foto humana española única en vez de humo abstracto.
   let heroUrl: string | null = null;
   let heroError: string | null = null;
+  let heroPromptUsed: string | null = null;
   try {
-    heroUrl = await generateBlogHero(buildHeroPrompt(post.title), lockRes.data.slug);
+    const scene = await buildHeroSceneFromTitle(post.title);
+    heroPromptUsed = buildHeroPrompt(scene);
+    heroUrl = await generateBlogHero(heroPromptUsed, lockRes.data.slug);
   } catch (e) {
     heroError = (e as Error).message.slice(0, 240);
   }
@@ -84,6 +90,7 @@ export async function POST(req: NextRequest) {
       hero_image_alt: post.title,
       hero_status: heroUrl ? "ready" : "failed",
       hero_error: heroError,
+      hero_prompt: heroPromptUsed,
       seo_status: "pending",
     })
     .eq("id", postId)
