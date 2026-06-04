@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { psyBlogSb, BLOG_TABLE } from "@/lib/psy-blog";
+import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,17 +37,38 @@ export async function POST(req: NextRequest) {
 
   const psiName = agent.first_name || agent.name.split(" ")[0];
 
+  // 2) Sacar especialidad de la psicóloga desde Amelia (note + description).
+  let especialidad = "";
+  let bio = "";
+  try {
+    const rows = await ameliaQuery<{ note: string | null; description: string | null }>(
+      `SELECT note, description FROM ${ameliaTable("users")} WHERE id = ? LIMIT 1`,
+      [agent.provider_id],
+    );
+    if (rows.length > 0) {
+      especialidad = (rows[0].note ?? "").trim().slice(0, 400);
+      bio = (rows[0].description ?? "").trim().slice(0, 600);
+    }
+  } catch { /* best-effort */ }
+
+  const perfilBlock = (especialidad || bio)
+    ? `\nPERFIL DE LA PSICÓLOGA (úsalo para que la keyword encaje con su expertise):
+Nombre: ${psiName}
+${especialidad ? `Especialidades declaradas: ${especialidad}\n` : ""}${bio ? `Bio profesional: ${bio}\n` : ""}`
+    : "";
+
   const prompt = `Eres SEO senior y editor jefe del blog de Mente Sana Psicología (mentesanapsicologia.com).
 
 Vas a darle a la psicóloga ${psiName} un encargo concreto: keyword + título para que escriba un artículo de blog SEO.
-
+${perfilBlock}
 Reglas:
 - Keyword: long-tail (3-5 palabras), enfocada a pacientes hispanohablantes en España buscando ayuda psicológica.
+- DEBE alinearse con la especialidad de la psicóloga (si no la tenemos, opta por temáticas generales).
 - Volumen de búsqueda medio (no muy nicho, no super competitivo).
 - Temáticas válidas: ansiedad, depresión, autoestima, relaciones, duelo, estrés laboral, crianza, decisiones vitales, hábitos, mindfulness, terapia online.
 - NO uses keywords ya utilizadas (te las paso abajo).
 - Título: 50-65 caracteres, contiene la keyword o variación, promete valor concreto, sin clickbait.
-- Outline: 3-5 puntos breves que la psicóloga debe cubrir en el cuerpo.
+- Outline: 3-5 puntos breves que la psicóloga debe cubrir en el cuerpo, en línea con su enfoque clínico.
 
 Keywords ya usadas (NO repetir):
 ${usedKeywords || "(ninguna aún)"}
@@ -59,7 +81,7 @@ Responde SOLO con JSON válido:
   "keyword": "...",
   "title": "...",
   "outline": ["Punto 1...", "Punto 2...", "Punto 3..."],
-  "rationale": "Una frase explicando por qué este tema tiene tracción SEO ahora"
+  "rationale": "Una frase explicando por qué este tema tiene tracción SEO Y por qué encaja con la especialidad de esta psicóloga"
 }`;
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
