@@ -20,11 +20,26 @@ export default async function PsiBlogPage() {
   }
   const sb = psyBlogSb();
   const { data } = await sb
-    .from("psy_blog_posts")
-    .select("id, keyword, title, slug, status, scheduled_for, published_at, hero_url, hero_status, seo_status, created_at, updated_at")
+    .from("blog_articles")
+    .select("id, keyword, title, slug, status, scheduled_for, publish_date, hero_image, hero_status, seo_status, created_at, updated_at")
     .eq("provider_id", psi.provider_id)
     .order("updated_at", { ascending: false })
     .limit(200);
 
-  return <BlogListClient initialPosts={data ?? []} psyName={psi.name} />;
+  const posts = (data ?? []).map((r) => ({
+    id: String(r.id),
+    keyword: r.keyword ?? "",
+    title: r.title,
+    slug: r.slug,
+    status: r.status,
+    scheduled_for: r.scheduled_for,
+    published_at: r.publish_date,
+    hero_url: r.hero_image,
+    hero_status: r.hero_status ?? "ready",
+    seo_status: r.seo_status ?? "ready",
+    created_at: r.created_at ?? r.publish_date,
+    updated_at: r.updated_at ?? r.publish_date,
+  }));
+
+  return <BlogListClient initialPosts={posts} psyName={psi.name} />;
 }
