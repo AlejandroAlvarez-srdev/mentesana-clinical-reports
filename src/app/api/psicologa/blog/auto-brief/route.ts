@@ -192,12 +192,46 @@ Responde SOLO con JSON:
     return NextResponse.json({ error: "no_title_returned" }, { status: 502 });
   }
 
+  // Garantía de título único: si el título choca con un blog_articles existente
+  // (case-insensitive, trim), pedimos a Claude que reformule. Hasta 3 intentos.
+  let finalTitle = parsed.title.trim();
+  let titleAttempts = 0;
+  while (titleAttempts < 3) {
+    const collision = await sb.from("blog_articles")
+      .select("id")
+      .ilike("title", finalTitle)
+      .neq("status", "archived")
+      .limit(1);
+    if (!collision.data || collision.data.length === 0) break;
+    // Pedir reformulación
+    const reform = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 200,
+        temperature: 0.95,
+        messages: [{
+          role: "user",
+          content: `El título "${finalTitle}" ya existe en otro post. Reformúlalo manteniendo la keyword "${assigned.keyword}" pero con un ángulo distinto. Solo devuelve el nuevo título, sin comillas ni explicaciones, 50-65 caracteres.`,
+        }],
+      }),
+    });
+    if (!reform.ok) break;
+    const rj = await reform.json();
+    const alt = String(rj.content?.[0]?.text ?? "").trim().replace(/^["']|["']$/g, "");
+    if (!alt || alt.length < 10) break;
+    finalTitle = alt;
+    titleAttempts++;
+  }
+
   return NextResponse.json({
     keyword: assigned.keyword,
     keyword_id: assigned.id,
     category: assigned.category,
-    title: parsed.title.trim(),
+    title: finalTitle,
     outline: Array.isArray(parsed.outline) ? parsed.outline.slice(0, 6) : [],
     rationale: typeof parsed.rationale === "string" ? parsed.rationale : "",
+    title_attempts: titleAttempts,
   });
 }

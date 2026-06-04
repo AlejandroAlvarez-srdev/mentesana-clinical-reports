@@ -89,10 +89,20 @@ export async function POST(req: NextRequest) {
 
   if (existing.data?.id) {
     const upd = await sb.from(BLOG_TABLE).update(payload).eq("id", existing.data.id).select().single();
-    if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
+    if (upd.error) {
+      if (upd.error.code === "23505" && upd.error.message.includes("blog_articles_title_uniq")) {
+        return NextResponse.json({ error: "title_already_exists", hint: "Cambia el título manualmente o regenera con 🎲 Otro tema." }, { status: 409 });
+      }
+      return NextResponse.json({ error: upd.error.message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, post: upd.data, created: false });
   }
   const ins = await sb.from(BLOG_TABLE).insert({ ...payload, publish_date: new Date().toISOString() }).select().single();
-  if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+  if (ins.error) {
+    if (ins.error.code === "23505" && ins.error.message.includes("blog_articles_title_uniq")) {
+      return NextResponse.json({ error: "title_already_exists", hint: "Otro post ya tiene este título. Cambia el título manualmente o pide otro tema." }, { status: 409 });
+    }
+    return NextResponse.json({ error: ins.error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, post: ins.data, created: true });
 }

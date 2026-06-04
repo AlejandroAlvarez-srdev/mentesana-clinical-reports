@@ -51,7 +51,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     update.content_hash = contentHash(title, md);
   }
   const upd = await sb.from(BLOG_TABLE).update(update).eq("id", numId).select().single();
-  if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
+  if (upd.error) {
+    if (upd.error.code === "23505" && upd.error.message.includes("blog_articles_title_uniq")) {
+      return NextResponse.json({ error: "title_already_exists", hint: "Ese título ya lo usa otro post. Cambia algo y vuelve a guardar." }, { status: 409 });
+    }
+    return NextResponse.json({ error: upd.error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, post: upd.data });
 }
 
