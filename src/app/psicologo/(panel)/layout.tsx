@@ -28,6 +28,7 @@ const nav = [
   { href: "/psicologo/pacientes", label: "Mis pacientes", emoji: "👥" },
   { href: "/psicologo/acompana", label: "Acompaña", emoji: "🌿" },
   { href: "/psicologo/asistente", label: "Asistente", emoji: "🤖" },
+  { href: "/psicologo/blog", label: "Blog SEO", emoji: "✍️" },
   { href: "/psicologo/quejas", label: "Reportes al jefe", emoji: "💬" },
 ];
 
