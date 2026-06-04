@@ -24,16 +24,29 @@ export async function POST(req: NextRequest) {
   const { agent } = auth;
   if (!ANTHROPIC_KEY) return NextResponse.json({ error: "ai_not_configured" }, { status: 500 });
 
-  // 1) Recoger keywords ya utilizadas (últimas 30) — evita duplicados
+  // 1) Recoger TODAS las keywords ya utilizadas en el blog (legacy + nuevas).
+  //    Es la única forma de garantizar que cada artículo tiene keyword única.
+  //    Como Claude tiene context window grande, podemos pasar miles sin problema.
   const sb = psyBlogSb();
   const { data: recent } = await sb
     .from(BLOG_TABLE)
-    .select("keyword, title")
+    .select("keyword, title, slug")
     .not("keyword", "is", null)
     .order("publish_date", { ascending: false })
-    .limit(30);
-  const usedKeywords = (recent ?? []).map(r => r.keyword).filter(Boolean).join(", ");
-  const usedTitles = (recent ?? []).slice(0, 10).map(r => r.title).filter(Boolean).join(" | ");
+    .limit(2000); // cubre ~5 años de operación a 1 post/día
+
+  // También cogemos los slugs (sin keyword) de la tabla legacy — son señal
+  // de qué se ha cubierto históricamente aunque no esté la keyword guardada.
+  const { data: legacySlugs } = await sb
+    .from(BLOG_TABLE)
+    .select("slug, title")
+    .is("keyword", null)
+    .order("publish_date", { ascending: false })
+    .limit(500);
+
+  const usedKeywords = Array.from(new Set((recent ?? []).map(r => r.keyword?.toLowerCase().trim()).filter(Boolean))).join(", ");
+  const usedTitles = (recent ?? []).slice(0, 20).map(r => r.title).filter(Boolean).join(" | ");
+  const legacyTitles = (legacySlugs ?? []).slice(0, 40).map(r => r.title).filter(Boolean).join(" | ");
 
   const psiName = agent.first_name || agent.name.split(" ")[0];
 
@@ -70,11 +83,14 @@ Reglas:
 - Título: 50-65 caracteres, contiene la keyword o variación, promete valor concreto, sin clickbait.
 - Outline: 3-5 puntos breves que la psicóloga debe cubrir en el cuerpo, en línea con su enfoque clínico.
 
-Keywords ya usadas (NO repetir):
+Keywords ya usadas en el blog (NO repetir ni dar variaciones casi idénticas):
 ${usedKeywords || "(ninguna aún)"}
 
-Títulos recientes para que evites parecerte:
+Títulos recientes de psicólogas (no te parezcas):
 ${usedTitles || "(ninguno aún)"}
+
+Títulos legacy del blog (más antiguos, evita repetir tema aunque la formulación sea distinta):
+${legacyTitles || "(ninguno)"}
 
 Responde SOLO con JSON válido:
 {
