@@ -1,41 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const PURPLE = "#6A178C";
 const GOLD = "#D4AF37";
 
-type Step = "keyword" | "title" | "body" | "review";
+type Step = "brief" | "body" | "review";
 
 export default function NewPostClient() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("keyword");
+  const [step, setStep] = useState<Step>("brief");
   const [keyword, setKeyword] = useState("");
-  const [titles, setTitles] = useState<string[]>([]);
   const [title, setTitle] = useState("");
+  const [outline, setOutline] = useState<string[]>([]);
+  const [rationale, setRationale] = useState("");
   const [bodyMd, setBodyMd] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
   const [loading, setLoading] = useState(false);
+  const [briefLoading, setBriefLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
 
-  async function generateTitles() {
-    if (!keyword.trim()) return;
-    setLoading(true); setError(null);
+  const fetchBrief = useCallback(async () => {
+    setBriefLoading(true); setError(null);
     try {
-      const r = await fetch("/api/psicologa/blog/generate-title", {
+      const r = await fetch("/api/psicologa/blog/auto-brief", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword }),
       });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "error_ia"); return; }
-      setTitles(j.titles ?? []);
-      setStep("title");
-    } finally { setLoading(false); }
-  }
+      setKeyword(j.keyword ?? "");
+      setTitle(j.title ?? "");
+      setOutline(Array.isArray(j.outline) ? j.outline : []);
+      setRationale(j.rationale ?? "");
+    } finally { setBriefLoading(false); }
+  }, []);
+
+  // Al entrar al wizard la IA decide keyword + título inmediatamente.
+  useEffect(() => { void fetchBrief(); }, [fetchBrief]);
 
   async function saveDraft(opts?: { schedule?: boolean }) {
     if (!keyword.trim() || !title.trim()) return;
@@ -84,65 +89,101 @@ export default function NewPostClient() {
         <div style={{ padding: 10, marginBottom: 14, background: "#fee2e2", color: "#991b1b", borderRadius: 8, fontSize: 13, border: "1px solid #fecaca" }}>❌ {error}</div>
       )}
 
-      {step === "keyword" && (
+      {step === "brief" && (
         <div style={card}>
-          <Label>1. Palabra clave SEO</Label>
-          <Hint>¿Sobre qué buscan los pacientes? Una sola keyword o frase larga. Ej: <em>ansiedad nocturna</em>, <em>cómo superar una ruptura</em>.</Hint>
-          <input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="ej. ataques de pánico"
-            style={input}
-            autoFocus
-          />
-          <div style={{ marginTop: 14, textAlign: "right" }}>
-            <button onClick={generateTitles} disabled={!keyword.trim() || loading} style={primaryBtn(!keyword.trim() || loading)}>
-              {loading ? "Generando…" : "Generar 3 títulos con IA →"}
-            </button>
-          </div>
-        </div>
-      )}
+          <Label>1. Tu encargo de hoy</Label>
+          <Hint>La IA elige la keyword y el título para que el artículo posicione bien. Tú escribes el cuerpo. Si no te convence el tema, dale a <strong>🎲 Otro tema</strong>.</Hint>
 
-      {step === "title" && (
-        <div style={card}>
-          <Label>2. Elige tu título</Label>
-          <Hint>La IA ha generado 3 propuestas para tu keyword <code style={codePill}>{keyword}</code>. Selecciona el que más te guste — puedes editarlo después.</Hint>
-          <div style={{ display: "grid", gap: 10 }}>
-            {titles.map((t, i) => (
-              <button key={i} onClick={() => { setTitle(t); setStep("body"); }} style={{
-                textAlign: "left", padding: 14, border: `1.5px solid ${title === t ? PURPLE : "rgba(0,0,0,0.08)"}`,
-                background: title === t ? `${PURPLE}08` : "#fff",
-                borderRadius: 10, fontSize: 14, color: "#1a1a2e", fontWeight: 600, cursor: "pointer",
-              }}>{t}</button>
-            ))}
-          </div>
-          <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "space-between" }}>
-            <button onClick={() => setStep("keyword")} style={secondaryBtn(false)}>← Cambiar keyword</button>
-            <button onClick={generateTitles} disabled={loading} style={secondaryBtn(loading)}>{loading ? "Generando…" : "🔄 Regenerar"}</button>
-          </div>
+          {briefLoading && (
+            <div style={{ padding: 40, textAlign: "center" }}>
+              <div style={{ display: "inline-block", width: 26, height: 26, border: `3px solid ${PURPLE}22`, borderTopColor: PURPLE, borderRadius: "50%", animation: "ms-spin 0.8s linear infinite" }} />
+              <p style={{ fontSize: 13, color: "#666", marginTop: 12 }}>Generando tu encargo SEO…</p>
+              <style>{`@keyframes ms-spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
+
+          {!briefLoading && keyword && (
+            <>
+              <div style={{ padding: 18, background: `linear-gradient(135deg, ${PURPLE}06, ${GOLD}06)`, border: `1px solid ${PURPLE}22`, borderRadius: 12, marginBottom: 14 }}>
+                <p style={{ fontSize: 11, color: GOLD, fontWeight: 800, letterSpacing: 0.4, margin: 0, textTransform: "uppercase" }}>
+                  ★ Keyword SEO asignada
+                </p>
+                <p style={{ fontSize: 18, color: PURPLE, fontWeight: 700, margin: "6px 0 14px", fontFamily: "ui-monospace, monospace" }}>
+                  {keyword}
+                </p>
+                <p style={{ fontSize: 11, color: GOLD, fontWeight: 800, letterSpacing: 0.4, margin: 0, textTransform: "uppercase" }}>
+                  Título sugerido
+                </p>
+                <h2 style={{ fontSize: 22, color: "#1a1a2e", fontWeight: 800, margin: "6px 0 0", letterSpacing: "-0.02em", lineHeight: 1.25 }}>
+                  {title}
+                </h2>
+                {rationale && (
+                  <p style={{ fontSize: 12, color: "#666", marginTop: 14, fontStyle: "italic", lineHeight: 1.5 }}>
+                    💡 {rationale}
+                  </p>
+                )}
+              </div>
+
+              {outline.length > 0 && (
+                <div style={{ padding: 14, background: "#fafafa", borderRadius: 10, marginBottom: 14 }}>
+                  <p style={{ fontSize: 11, color: PURPLE, fontWeight: 800, letterSpacing: 0.4, margin: "0 0 8px", textTransform: "uppercase" }}>
+                    Guion sugerido (te lo damos hecho)
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "#1a1a2e", lineHeight: 1.7 }}>
+                    {outline.map((p, i) => <li key={i}>{p}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              <details style={{ marginBottom: 14 }}>
+                <summary style={{ cursor: "pointer", fontSize: 12, color: "#666", fontWeight: 600 }}>
+                  ¿Quieres editar el título manualmente?
+                </summary>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ ...input, marginTop: 8 }} />
+              </details>
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
+                <button onClick={fetchBrief} disabled={briefLoading} style={secondaryBtn(briefLoading)}>
+                  🎲 Otro tema
+                </button>
+                <button onClick={() => setStep("body")} disabled={!title.trim()} style={primaryBtn(!title.trim())}>
+                  Empezar a escribir →
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {step === "body" && (
         <div style={card}>
-          <Label>3. Tu título</Label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} style={input} />
+          <p style={{ fontSize: 11, color: GOLD, fontWeight: 800, letterSpacing: 0.4, margin: 0, textTransform: "uppercase" }}>
+            ★ KW: <span style={{ color: PURPLE, fontFamily: "ui-monospace, monospace" }}>{keyword}</span>
+          </p>
+          <h2 style={{ fontSize: 20, color: "#1a1a2e", fontWeight: 800, margin: "4px 0 16px", letterSpacing: "-0.02em" }}>{title}</h2>
 
-          <div style={{ height: 14 }} />
+          {outline.length > 0 && (
+            <details style={{ marginBottom: 14, padding: 10, background: "#fafafa", borderRadius: 8 }}>
+              <summary style={{ cursor: "pointer", fontSize: 12, color: PURPLE, fontWeight: 700 }}>📋 Ver guion sugerido</summary>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, color: "#1a1a2e", lineHeight: 1.6 }}>
+                {outline.map((p, i) => <li key={i}>{p}</li>)}
+              </ul>
+            </details>
+          )}
 
-          <Label>4. Escribe el cuerpo del artículo</Label>
-          <Hint>Markdown soportado: <code>**negrita**</code>, <code>## títulos</code>, <code>- listas</code>, <code>[texto](url)</code>. La IA NUNCA tocará tu contenido — sale tal cual lo escribes.</Hint>
+          <Label>2. Escribe el cuerpo del artículo</Label>
+          <Hint>Markdown soportado: <code>**negrita**</code>, <code>## títulos</code>, <code>- listas</code>, <code>[texto](url)</code>. La IA NUNCA tocará tu contenido.</Hint>
           <textarea
             value={bodyMd}
             onChange={(e) => setBodyMd(e.target.value)}
             rows={20}
-            placeholder={`## Introducción\n\nEscribe aquí tu artículo en markdown.\n\n## Por qué es importante\n\n...\n\n## Conclusiones\n\n...`}
+            placeholder={`## Introducción\n\nEmpieza explicando el problema desde tu experiencia clínica.\n\n## ${outline[0] ?? "Primer punto del guion"}\n\n...`}
             style={{ ...input, fontFamily: "ui-monospace, monospace", minHeight: 380, resize: "vertical" }}
           />
           <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>{bodyMd.split(/\s+/).filter(Boolean).length} palabras</p>
 
           <div style={{ marginTop: 14, display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
-            <button onClick={() => setStep("title")} style={secondaryBtn(false)}>← Volver a títulos</button>
+            <button onClick={() => setStep("brief")} style={secondaryBtn(false)}>← Cambiar tema</button>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => saveDraft()} disabled={!title.trim() || loading} style={secondaryBtn(!title.trim() || loading)}>
                 {loading ? "Guardando…" : savedDraftId ? "Guardado ✓" : "💾 Guardar borrador"}
@@ -157,7 +198,7 @@ export default function NewPostClient() {
 
       {step === "review" && (
         <div style={card}>
-          <Label>5. Revisa antes de publicar</Label>
+          <Label>3. Revisa antes de publicar</Label>
           <div style={{ padding: 16, background: "#fafafa", borderRadius: 10, marginTop: 8 }}>
             <p style={{ fontSize: 11, color: GOLD, fontWeight: 800, letterSpacing: 0.4, margin: 0 }}>KEYWORD · {keyword.toUpperCase()}</p>
             <h2 style={{ margin: "6px 0 0", fontSize: 22, color: "#1a1a2e", fontWeight: 800 }}>{title}</h2>
@@ -193,7 +234,7 @@ export default function NewPostClient() {
 }
 
 function ProgressBar({ step }: { step: Step }) {
-  const steps: Step[] = ["keyword", "title", "body", "review"];
+  const steps: Step[] = ["brief", "body", "review"];
   const idx = steps.indexOf(step);
   return (
     <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
@@ -206,7 +247,6 @@ function ProgressBar({ step }: { step: Step }) {
 
 const card: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: 22, border: "1px solid rgba(0,0,0,0.05)" };
 const input: React.CSSProperties = { width: "100%", padding: "10px 12px", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 8, fontSize: 14, boxSizing: "border-box", fontFamily: "inherit" };
-const codePill: React.CSSProperties = { background: "#f5f5f7", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontFamily: "ui-monospace, monospace", color: PURPLE };
 const primaryBtn = (d: boolean): React.CSSProperties => ({
   padding: "11px 18px", borderRadius: 8, border: "none",
   background: d ? "rgba(0,0,0,0.06)" : PURPLE, color: d ? "#888" : "#fff",
