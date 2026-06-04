@@ -130,7 +130,26 @@ export async function POST(req: NextRequest) {
     }, { status: 409 });
   }
 
-  // 5) Pedir a Claude SOLO título + outline + rationale.
+  // 5) Recoger TODOS los títulos ya usados en blog_articles para que Claude los
+  //    EVITE desde el primer intento (no solo en la verificación post-hoc).
+  //    Pasamos los más relevantes: misma categoría primero, después generales recientes.
+  const sameCat = await sb.from("blog_articles")
+    .select("title")
+    .ilike("category", `%${assigned.category}%`)
+    .neq("status", "archived")
+    .order("publish_date", { ascending: false })
+    .limit(80);
+  const generalRecent = await sb.from("blog_articles")
+    .select("title")
+    .neq("status", "archived")
+    .order("publish_date", { ascending: false })
+    .limit(120);
+  const forbiddenSet = new Set<string>();
+  (sameCat.data ?? []).forEach(r => r.title && forbiddenSet.add(r.title));
+  (generalRecent.data ?? []).forEach(r => r.title && forbiddenSet.add(r.title));
+  const forbiddenList = Array.from(forbiddenSet).join("\n- ");
+
+  // 6) Pedir a Claude SOLO título + outline + rationale, con la lista de prohibidos.
   const perfilBlock = (especialidad || bio)
     ? `\nPerfil de la psicóloga:
 Nombre: ${psiName}
@@ -144,9 +163,13 @@ Te asigno una keyword YA decidida del universo curado. Tú generas título + out
 KEYWORD ASIGNADA (NO la cambies, NO la reformules): "${assigned.keyword}"
 Categoría: ${assigned.category}
 ${perfilBlock}
+TÍTULOS YA USADOS EN EL BLOG — NO REPITAS NINGUNO NI CREES VARIACIONES OBVIAS:
+- ${forbiddenList || "(ninguno todavía)"}
+
 Reglas:
 - Título: 50-65 caracteres, contiene la keyword o variación natural, promete valor concreto, sin clickbait.
-- Outline: 4-6 puntos breves que la psicóloga debe cubrir en el cuerpo, alineados con su enfoque clínico si tenemos perfil.
+- Tu título DEBE ser claramente distinto de la lista anterior (no solo cambiar un sinónimo). Ángulo nuevo o promesa nueva.
+- Outline: 4-6 puntos breves que la psicóloga debe cubrir, alineados con su enfoque clínico si tenemos perfil.
 - Rationale: una frase explicando por qué esta keyword encaja con su expertise.
 
 Responde SOLO con JSON:
@@ -161,7 +184,7 @@ Responde SOLO con JSON:
     headers: { "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 600,
+      max_tokens: 900,
       temperature: 0.85,
       messages: [{ role: "user", content: prompt }],
     }),
@@ -233,5 +256,6 @@ Responde SOLO con JSON:
     outline: Array.isArray(parsed.outline) ? parsed.outline.slice(0, 6) : [],
     rationale: typeof parsed.rationale === "string" ? parsed.rationale : "",
     title_attempts: titleAttempts,
+    forbidden_titles_in_prompt: forbiddenSet.size,
   });
 }
