@@ -10,19 +10,24 @@ const EXTENSION_WEBSTORE_URL = process.env.NEXT_PUBLIC_PSICOLOGA_EXTENSION_WEBST
 const EXTENSION_ZIP_URL = process.env.NEXT_PUBLIC_PSICOLOGA_EXTENSION_URL
   || "https://your-project.supabase.co/storage/v1/object/public/mentesana-app/mentesana-meet-ext.zip";
 
-export default function InstalarExtensionClient({ name }: { name: string }) {
+export default function InstalarExtensionClient({ name, forced = false }: { name: string; forced?: boolean }) {
   const [code, setCode] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [detected, setDetected] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function genCode() {
     setLoading(true);
+    setError(null);
     try {
       const r = await fetch("/api/psicologa/extension/pair-code", { method: "POST" });
       const j = await r.json();
       if (j.code) { setCode(j.code); setExpiresAt(j.expires_at); }
+      else { setError(j.error ?? `Sin código (HTTP ${r.status})`); }
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
     } finally { setLoading(false); }
   }
 
@@ -79,12 +84,22 @@ export default function InstalarExtensionClient({ name }: { name: string }) {
               </a>
             </div>
 
+            {forced && (
+              <div style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 10, padding: 14, fontSize: 12.5, color: "#92400E", marginBottom: 10 }}>
+                ⚙️ <b>Modo re-vinculación:</b> ya tienes una versión de la extensión activa. Si vas a actualizar a la nueva versión (v0.2.0), primero quítala desde <code style={{ background: "#fff", padding: "1px 5px", borderRadius: 3 }}>chrome://extensions</code> y luego instala la nueva. Después pega aquí el código.
+              </div>
+            )}
             <div style={{ background: "#FAF5FF", border: `2px dashed ${PURPLE}`, borderRadius: 12, padding: 24, textAlign: "center", marginTop: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: PURPLE, letterSpacing: 1.5, textTransform: "uppercase" }}>Tu código de vinculación</div>
               <div style={{ fontSize: 44, fontWeight: 800, color: PURPLE, letterSpacing: 8, marginTop: 8, fontFamily: "monospace" }}>
-                {code ?? "------"}
+                {loading ? "..." : code ?? "------"}
               </div>
               <div style={{ fontSize: 12, color: "#64748B", marginTop: 6 }}>Caduca en 10 minutos.</div>
+              {error && (
+                <div style={{ marginTop: 10, padding: 8, background: "#FEE2E2", color: "#991B1B", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                  ❌ {error}
+                </div>
+              )}
               <button onClick={genCode} disabled={loading} style={{ marginTop: 12, background: "transparent", color: PURPLE, border: `1px solid ${PURPLE}`, padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 {loading ? "..." : "Generar nuevo código"}
               </button>
