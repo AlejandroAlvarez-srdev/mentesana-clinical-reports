@@ -13,6 +13,7 @@ export default function NewPostClient() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("brief");
   const [keyword, setKeyword] = useState("");
+  const [keywordId, setKeywordId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [outline, setOutline] = useState<string[]>([]);
   const [rationale, setRationale] = useState("");
@@ -23,16 +24,18 @@ export default function NewPostClient() {
   const [error, setError] = useState<string | null>(null);
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
 
-  const fetchBrief = useCallback(async () => {
+  const fetchBrief = useCallback(async (releaseId?: number | null) => {
     setBriefLoading(true); setError(null);
     try {
       const r = await fetch("/api/psicologa/blog/auto-brief", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(releaseId ? { release_keyword_id: releaseId } : {}),
       });
       const j = await r.json();
       if (!r.ok) { setError(j.error ?? "error_ia"); return; }
       setKeyword(j.keyword ?? "");
+      setKeywordId(typeof j.keyword_id === "number" ? j.keyword_id : null);
       setTitle(j.title ?? "");
       setOutline(Array.isArray(j.outline) ? j.outline : []);
       setRationale(j.rationale ?? "");
@@ -40,7 +43,7 @@ export default function NewPostClient() {
   }, []);
 
   // Al entrar al wizard la IA decide keyword + título inmediatamente.
-  useEffect(() => { void fetchBrief(); }, [fetchBrief]);
+  useEffect(() => { void fetchBrief(null); }, [fetchBrief]);
 
   async function saveDraft(opts?: { schedule?: boolean }) {
     if (!keyword.trim() || !title.trim()) return;
@@ -143,7 +146,7 @@ export default function NewPostClient() {
               </details>
 
               <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
-                <button onClick={fetchBrief} disabled={briefLoading} style={secondaryBtn(briefLoading)}>
+                <button onClick={() => fetchBrief(keywordId)} disabled={briefLoading} style={secondaryBtn(briefLoading)}>
                   🎲 Otro tema
                 </button>
                 <button onClick={() => setStep("body")} disabled={!title.trim()} style={primaryBtn(!title.trim())}>

@@ -64,5 +64,18 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const { post, sb } = res;
   const upd = await sb.from(BLOG_TABLE).update({ status: "archived" }).eq("id", numId);
   if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
+
+  // Si el post estaba bloqueando una keyword del universo, la liberamos para
+  // que otra psi pueda usarla. Solo si NO estaba publicado (caso ya cubierto en publish).
+  if (post.keyword && post.status !== "published") {
+    await sb.from("blog_keyword_universe").update({
+      status: "available",
+      assigned_provider_id: null,
+      assigned_at: null,
+      lock_expires_at: null,
+      post_id: null,
+    }).eq("keyword", post.keyword).neq("status", "published");
+  }
+
   return NextResponse.json({ ok: true, archived_id: post.id });
 }

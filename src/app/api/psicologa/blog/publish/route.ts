@@ -78,5 +78,14 @@ export async function POST(req: NextRequest) {
     .single();
   if (final.error) return NextResponse.json({ error: final.error.message }, { status: 500 });
 
+  // Marcar la keyword del universo como 'published' y enlazarla con este post.
+  if (post.keyword) {
+    await sb.from("blog_keyword_universe").update({
+      status: "published",
+      post_id: postId,
+      lock_expires_at: null,
+    }).eq("keyword", post.keyword);
+  }
+
   return NextResponse.json({ ok: true, post: final.data });
 }
