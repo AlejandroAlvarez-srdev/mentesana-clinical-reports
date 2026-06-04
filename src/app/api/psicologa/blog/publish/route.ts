@@ -1,6 +1,7 @@
 // POST /api/psicologa/blog/publish { post_id }
 // Pipeline sobre blog_articles (mismo registro, solo cambia status).
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { psyBlogSb, BLOG_TABLE, contentHash, publishIdempotencyKey, generateBlogHero, buildHeroPrompt } from "@/lib/psy-blog";
 
@@ -85,6 +86,16 @@ export async function POST(req: NextRequest) {
       post_id: postId,
       lock_expires_at: null,
     }).eq("keyword", post.keyword);
+  }
+
+  // Invalida cache de Next/Vercel para que el post sea visible YA en /blog
+  // (sin esto, ISR tarda hasta 10 min en regenerar y los visitantes ven 404 si
+  // alguien intentó la URL antes de publicarse).
+  try {
+    revalidatePath(`/blog/${final.data.slug}`);
+    revalidatePath("/blog");
+  } catch (e) {
+    console.warn("[publish] revalidate failed (non-fatal):", (e as Error).message);
   }
 
   return NextResponse.json({ ok: true, post: final.data });
