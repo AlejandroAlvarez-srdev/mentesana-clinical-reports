@@ -47,15 +47,7 @@ export default function PatientTasks({ customerId, appointmentId, patientFirstNa
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [customerId]);
 
-  async function uploadFile(taskId: string, file: File): Promise<{ url: string; storage_path: string; filename: string; mime_type: string; size_bytes: number } | null> {
-    const r = await fetch(`/api/psicologa/patient-tasks/${taskId}/upload`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: file.name }) });
-    if (!r.ok) return null;
-    const { signedUrl, token, path, publicUrl } = await r.json();
-    // PUT directo al signed URL — Supabase espera multipart cuando se usa formData, pero también acepta PUT con body raw + header x-upsert. Usamos fetch directo.
-    const up = await fetch(signedUrl, { method: "PUT", body: file, headers: { "x-upsert": "true", "Content-Type": file.type || "application/octet-stream" } });
-    if (!up.ok) return null;
-    return { url: publicUrl, storage_path: path, filename: file.name, mime_type: file.type, size_bytes: file.size };
-  }
+  const uploadFile = uploadTaskFile;
 
   async function create() {
     if (!title.trim()) return;
@@ -197,7 +189,17 @@ function TaskRow({ t, counts, open, onOpen, onToggle, onDelete, onReload, upload
   );
 }
 
-function TaskThread({ taskId, onChange, uploadFile }: { taskId: string; onChange: () => void; uploadFile: (taskId: string, file: File) => Promise<any> }) {
+// Subidor reutilizable (lo usa también el panel central de Tareas).
+export async function uploadTaskFile(taskId: string, file: File): Promise<{ url: string; storage_path: string; filename: string; mime_type: string; size_bytes: number } | null> {
+  const r = await fetch(`/api/psicologa/patient-tasks/${taskId}/upload`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: file.name }) });
+  if (!r.ok) return null;
+  const { signedUrl, path, publicUrl } = await r.json();
+  const up = await fetch(signedUrl, { method: "PUT", body: file, headers: { "x-upsert": "true", "Content-Type": file.type || "application/octet-stream" } });
+  if (!up.ok) return null;
+  return { url: publicUrl, storage_path: path, filename: file.name, mime_type: file.type, size_bytes: file.size };
+}
+
+export function TaskThread({ taskId, onChange, uploadFile = uploadTaskFile }: { taskId: string; onChange: () => void; uploadFile?: (taskId: string, file: File) => Promise<any> }) {
   const [data, setData] = useState<{ messages: Message[]; attachments: Attachment[] } | null>(null);
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
