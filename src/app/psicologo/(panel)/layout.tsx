@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getPsicologa } from "@/lib/psicologa-auth";
-import { isExtensionActive } from "@/lib/psicologa-extension";
+import { hasPairedExtension } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -50,12 +50,12 @@ export default async function PsicologaLayout({ children }: { children: React.Re
   }
   const h = await headers();
   const isMobile = isMobileFromUA(h.get("user-agent"));
-  // Gate: la extensión tiene que estar activa (heartbeat en últimas 12h).
-  // No es polling — solo se valida una vez al cargar la página (SSR).
-  // 12h es generoso (cubre fines de semana fuera, throttling, noche)
-  // pero exige re-pareo cuando reinstala la ext: el device viejo se
-  // queda dormido y no la deja pasar hasta que pegue el código nuevo.
-  if (!p.is_supervisor && !isMobile && !(await isExtensionActive(p.provider_id))) {
+  // Gate one-time: basta con que la psi HAYA pareado la extensión alguna vez
+  // (fila no revocada). NO miramos heartbeat fresco: el service worker de Chrome
+  // se duerme y, con el gate antiguo (heartbeat 15 min), echaba a la psi al panel
+  // de instalar una y otra vez ("me saca / reinstalar" — Marlen, Mónica, Yeris).
+  // El uninstall real se detecta porque el pair endpoint revoca la fila vieja.
+  if (!p.is_supervisor && !isMobile && !(await hasPairedExtension(p.provider_id))) {
     redirect("/psicologo/instalar-extension");
   }
   const initials = (p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "");

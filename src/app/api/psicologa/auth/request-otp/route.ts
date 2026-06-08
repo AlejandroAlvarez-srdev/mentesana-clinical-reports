@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
 
   // Genera OTP 6 dígitos
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  // 20 min (antes 10): la entrega por email a veces tarda y el código caducaba
+  // antes de que llegara → "lo ingreso y no me deja" (caso Greslimar Padilla).
+  const expires = new Date(Date.now() + 20 * 60 * 1000).toISOString();
   await sb.from("psychologist_otp").upsert({ email, code, expires_at: expires, attempts: 0, created_at: new Date().toISOString() }, { onConflict: "email" });
 
   const greeting = firstName ? `Hola ${firstName},` : "Hola,";
@@ -60,12 +62,20 @@ export async function POST(req: NextRequest) {
   `;
   const html = emailLayout({ title: "Tu código de acceso · Mente Sana", preheader: `Código ${code}`, content });
 
-  await sendEmail({
+  // IMPORTANTE: antes ignorábamos el resultado de sendEmail → si Brevo fallaba
+  // (cuota, recipient inválido, rate-limit) la psi veía "código enviado" y no
+  // llegaba nada (casos Selene Oropeza, Yldamar Pereira, etc.). Ahora surface
+  // el fallo para que el login muestre "Error enviando código" y reintente.
+  const sent = await sendEmail({
     to: email,
     toName: firstName || (isLeader ? "Líder" : "Psicóloga"),
     subject: `Tu código: ${code}`,
     html,
   });
+  if (!sent.success) {
+    console.error("[otp] envío falló:", email, sent.error);
+    return NextResponse.json({ error: "email_send_failed" }, { status: 502 });
+  }
 
   return NextResponse.json({ ok: true });
 }
