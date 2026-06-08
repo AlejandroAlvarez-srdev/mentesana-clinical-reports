@@ -56,14 +56,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   );
 
   // Bonos activos del paciente (puede tener con otras psi también pero respetamos lo de su agenda)
+  // Filtramos por pcs.providerId para que el total/usadas sean SOLO la parte del
+  // bono asignada a ESTA psi (igual que el listado de pacientes). Sin el filtro,
+  // se sumaba el bono completo entre todas las psi y un bono de 8 salía 10.
   const packages = await ameliaQuery<any>(
     `SELECT p.id, pk.name, p.start, p.end, p.status,
-       (SELECT SUM(pcs.bookingsCount) FROM ${pcs} pcs WHERE pcs.packageCustomerId = p.id) total_bookings,
-       (SELECT COUNT(*) FROM ${cb} cb2 JOIN ${pcs} pcs2 ON pcs2.id = cb2.packageCustomerServiceId WHERE pcs2.packageCustomerId = p.id AND cb2.status IN ('approved','pending')) used_bookings
+       (SELECT SUM(pcs.bookingsCount) FROM ${pcs} pcs WHERE pcs.packageCustomerId = p.id AND pcs.providerId = ?) total_bookings,
+       (SELECT COUNT(*) FROM ${cb} cb2 JOIN ${pcs} pcs2 ON pcs2.id = cb2.packageCustomerServiceId WHERE pcs2.packageCustomerId = p.id AND pcs2.providerId = ? AND cb2.status IN ('approved','pending')) used_bookings
      FROM ${pc} p JOIN ${pks} pk ON pk.id = p.packageId
      WHERE p.customerId = ? AND p.status = 'approved' AND (p.end IS NULL OR p.end >= NOW())
      ORDER BY p.purchased DESC LIMIT 10`,
-    [customerId],
+    [provider_id, provider_id, customerId],
   );
 
   // Notas clínicas
