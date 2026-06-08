@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { ameliaQuery, ameliaExec, ameliaTable } from "@/lib/amelia-db";
+import { voyageEmbed } from "@/lib/voyage-embed";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -93,17 +94,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (!Number.isFinite(apptId)) return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   const body = await req.json().catch(() => ({}) as any);
 
-  // Verifica ownership
+  // Verifica ownership (y trae el nombre del paciente para el embedding RAG)
   const own = await ameliaQuery<any>(
-    `SELECT a.bookingStart, cb.customerId, cb.status booking_status
+    `SELECT a.bookingStart, cb.customerId, cb.status booking_status,
+            cu.firstName customer_fn, cu.lastName customer_ln
        FROM ${ameliaTable("appointments")} a
        LEFT JOIN ${ameliaTable("customer_bookings")} cb ON cb.appointmentId = a.id
+       LEFT JOIN ${ameliaTable("users")} cu ON cu.id = cb.customerId
       WHERE a.id = ? AND a.providerId = ? LIMIT 1`,
     [apptId, provider_id],
   );
   if (own.length === 0) return NextResponse.json({ error: "out_of_scope" }, { status: 403 });
 
   const customer_id = own[0].customerId ? Number(own[0].customerId) : null;
+  const patientName = `${own[0].customer_fn ?? ""} ${own[0].customer_ln ?? ""}`.trim();
   const session_date = own[0].bookingStart ? new Date(own[0].bookingStart).toISOString() : new Date().toISOString();
 
   // TRANSICIÓN 2026-06-02 → 2026-06-09: durante esta semana la psicóloga
@@ -163,6 +167,42 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       amelia_error = String(e?.message ?? e).slice(0, 200);
       console.error("[psicologa-appt-put] Amelia sync FAILED for appt", apptId, ":", amelia_error);
     }
+  }
+
+  // Embeb la HC para el asistente RAG (match_clinical_notes), incluyendo el
+  // nombre del paciente para que la búsqueda por nombre funcione. No bloqueante:
+  // si Voyage falla, la HC ya quedó guardada; embedded_at se queda null y un
+  // guardado posterior (o backfill) la embebe. Solo embebemos si hay contenido
+  // clínico real, no en un guardado de solo-asistencia.
+  try {
+    const { data: full } = await sb
+      .from("psychologist_clinical_notes")
+      .select("highlights, how_went, patient_state, intervention, next_steps, homework, red_flags")
+      .eq("appointment_id", apptId)
+      .eq("provider_id", provider_id)
+      .maybeSingle();
+    const hasContent = !!(full && (full.highlights || full.how_went || full.patient_state || full.intervention || full.next_steps || full.homework || full.red_flags));
+    if (hasContent) {
+      const text = [
+        patientName ? `Paciente: ${patientName}` : "",
+        full!.highlights && `Highlights: ${full!.highlights}`,
+        full!.how_went && `Cómo fue la sesión: ${full!.how_went}`,
+        full!.patient_state && `Estado del paciente: ${full!.patient_state}`,
+        full!.intervention && `Intervención: ${full!.intervention}`,
+        full!.next_steps && `Próximos pasos: ${full!.next_steps}`,
+        full!.homework && `Tareas: ${full!.homework}`,
+        full!.red_flags && `Alertas: ${full!.red_flags}`,
+      ].filter(Boolean).join("\n");
+      const emb = await voyageEmbed(text, "document");
+      if (emb) {
+        await sb.from("psychologist_clinical_notes")
+          .update({ embedding: emb, patient_name: patientName || null, embedded_at: new Date().toISOString() })
+          .eq("appointment_id", apptId)
+          .eq("provider_id", provider_id);
+      }
+    }
+  } catch (e: any) {
+    console.warn("[hc-embed] fallo embeddings HC appt", apptId, String(e?.message ?? e).slice(0, 200));
   }
 
   return NextResponse.json({ ok: true, amelia_synced, amelia_error });
