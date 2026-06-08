@@ -162,22 +162,27 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {/* Historial */}
+      {/* Historial — timeline glanceable para no repetir temas (Juliana) */}
       {history.length > 0 && (
         <section style={{ marginBottom: 18 }}>
-          <h2 style={{ fontSize: 16, color: "#1a1a2e", margin: "0 0 8px" }}>📚 Sesiones anteriores con {appt.customer_name.split(" ")[0]}</h2>
-          <div style={{ display: "grid", gap: 6 }}>
+          <h2 style={{ fontSize: 16, color: "#1a1a2e", margin: "0 0 10px" }}>📚 Sesiones anteriores con {appt.customer_name.split(" ")[0]} <span style={{ fontSize: 12, fontWeight: 500, color: "#888" }}>({history.length})</span></h2>
+          <div style={{ borderLeft: `2px solid ${PURPLE}22`, paddingLeft: 14, display: "grid", gap: 10 }}>
             {history.map(h => (
-              <details key={h.appointment_id} style={{ background: "#fff", borderRadius: 10, border: "1px solid rgba(0,0,0,0.06)" }}>
-                <summary style={{ padding: "10px 14px", cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: "#1a1a2e", listStyle: "none" }}>
-                  <span style={{ color: PURPLE }}>▸</span> {new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", year: "numeric" }).format(new Date(h.session_date))} {h.attended === false && "· ❌ no asistió"}
-                  {h.highlights && <span style={{ fontWeight: 500, color: "#666", marginLeft: 8, fontSize: 11.5 }}>· {h.highlights.slice(0, 80)}</span>}
-                </summary>
-                <div style={{ padding: "0 14px 14px", fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
-                  {h.highlights && <div style={{ marginBottom: 6 }}><strong>Highlights:</strong> {renderMarkdown(h.highlights)}</div>}
-                  {h.how_went && <div><strong>Cómo fue:</strong> {renderMarkdown(h.how_went)}</div>}
+              <div key={h.appointment_id} style={{ position: "relative", background: "#fff", borderRadius: 10, border: "1px solid rgba(0,0,0,0.06)", padding: "10px 14px" }}>
+                <div style={{ position: "absolute", left: -21, top: 14, width: 9, height: 9, borderRadius: "50%", background: h.attended === false ? "#dc2626" : PURPLE, border: "2px solid #FFFAF2" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: h.highlights ? 5 : 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: PURPLE }}>{new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", year: "numeric" }).format(new Date(h.session_date))}</span>
+                  {h.attended === true && <span style={{ fontSize: 9.5, fontWeight: 800, color: "#065f46", background: "rgba(16,185,129,0.14)", padding: "1px 7px", borderRadius: 999 }}>✓ asistió</span>}
+                  {h.attended === false && <span style={{ fontSize: 9.5, fontWeight: 800, color: "#991b1b", background: "rgba(220,38,38,0.1)", padding: "1px 7px", borderRadius: 999 }}>✗ no asistió</span>}
                 </div>
-              </details>
+                {h.highlights && <div style={{ fontSize: 12.5, color: "#1a1a2e", lineHeight: 1.55 }}>{renderMarkdown(h.highlights)}</div>}
+                {h.how_went && (
+                  <details style={{ marginTop: 4 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 11, fontWeight: 700, color: PURPLE, listStyle: "none" }}>▸ ver narrativa</summary>
+                    <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6, marginTop: 4 }}>{renderMarkdown(h.how_went)}</div>
+                  </details>
+                )}
+              </div>
             ))}
           </div>
         </section>
