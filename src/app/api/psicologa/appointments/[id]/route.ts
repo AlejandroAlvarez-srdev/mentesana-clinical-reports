@@ -14,6 +14,18 @@ const sb = createClient(
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Servicios de diagnóstico 9,99€ (ver reference_amelia_attendance). Estas citas
+// usan la Historia Clínica Inicial 9.99 estructurada en vez de la HC genérica.
+const DIAG_IDS = [8, 11];
+const DIAG_FIELD_KEYS = ["edad", "estado_civil", "pais", "ciudad", "motivo_consulta", "anamnesis", "evaluacion_funciones", "impresion_diagnostica", "plan_intervencion", "compromiso"] as const;
+const DIAG_LABELS: Record<string, string> = {
+  edad: "Edad", estado_civil: "Estado civil", pais: "País", ciudad: "Ciudad",
+  motivo_consulta: "Motivo de consulta", anamnesis: "Anamnesis",
+  evaluacion_funciones: "Evaluación de funciones psicológicas",
+  impresion_diagnostica: "Impresión diagnóstica", plan_intervencion: "Plan de intervención",
+  compromiso: "Compromiso",
+};
+
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requirePsicologa(req);
   if ("status" in auth) return auth;
@@ -28,7 +40,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const sv = ameliaTable("services");
 
   const rows = await ameliaQuery<any>(
-    `SELECT a.id appointment_id, a.bookingStart, a.bookingEnd, a.googleMeetUrl, a.providerId,
+    `SELECT a.id appointment_id, a.bookingStart, a.bookingEnd, a.googleMeetUrl, a.providerId, a.serviceId,
        s.name service_name, s.duration service_duration,
        cb.id booking_id, cb.customerId, cb.status booking_status,
        cu.firstName customer_fn, cu.lastName customer_ln
@@ -79,6 +91,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       customer_id: r.customerId,
       customer_name: `${r.customer_fn ?? ""} ${r.customer_ln ?? ""}`.trim() || "(sin nombre)",
       booking_status: r.booking_status,
+      // Cita de diagnóstico 9,99€ → usa la HC Inicial 9.99 estructurada.
+      is_diagnostico: DIAG_IDS.includes(Number(r.serviceId)),
     },
     note,
     history,
@@ -147,6 +161,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (typeof body[f] === "string") row[f] = body[f].slice(0, 5000);
   }
   if (typeof body.attended === "boolean") row.attended = body.attended;
+  // Campos de la HC Inicial 9.99 (identidad + anamnesis…) en JSONB.
+  if (body.diag_fields && typeof body.diag_fields === "object") {
+    const clean: Record<string, string> = {};
+    for (const k of DIAG_FIELD_KEYS) {
+      const v = body.diag_fields[k];
+      if (typeof v === "string" && v.trim()) clean[k] = v.slice(0, 5000);
+    }
+    row.diag_fields = Object.keys(clean).length ? clean : null;
+  }
 
   const { error } = await sb.from("psychologist_clinical_notes").upsert(row, { onConflict: "appointment_id,provider_id" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -178,14 +201,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (!body.draft) try {
     const { data: full } = await sb
       .from("psychologist_clinical_notes")
-      .select("highlights, how_went, patient_state, intervention, next_steps, homework, red_flags")
+      .select("highlights, how_went, patient_state, intervention, next_steps, homework, red_flags, diag_fields")
       .eq("appointment_id", apptId)
       .eq("provider_id", provider_id)
       .maybeSingle();
-    const hasContent = !!(full && (full.highlights || full.how_went || full.patient_state || full.intervention || full.next_steps || full.homework || full.red_flags));
+    const diag = (full?.diag_fields ?? {}) as Record<string, string>;
+    const diagHasContent = DIAG_FIELD_KEYS.some((k) => diag[k] && String(diag[k]).trim());
+    const hasContent = !!(full && (full.highlights || full.how_went || full.patient_state || full.intervention || full.next_steps || full.homework || full.red_flags || diagHasContent));
     if (hasContent) {
       const text = [
         patientName ? `Paciente: ${patientName}` : "",
+        // HC Inicial 9.99 (si aplica): incluimos identidad + anamnesis en el embedding.
+        ...DIAG_FIELD_KEYS.map((k) => (diag[k] && String(diag[k]).trim() ? `${DIAG_LABELS[k]}: ${diag[k]}` : "")),
         full!.highlights && `Highlights: ${full!.highlights}`,
         full!.how_went && `Cómo fue la sesión: ${full!.how_went}`,
         full!.patient_state && `Estado del paciente: ${full!.patient_state}`,

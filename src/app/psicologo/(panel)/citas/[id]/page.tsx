@@ -9,7 +9,18 @@ import Link from "next/link";
 
 const PURPLE = "#6A178C";
 
-type Appt = { appointment_id: number; booking_start_utc: string; booking_end_utc: string | null; service_name: string | null; google_meet_url: string | null; customer_id: number; customer_name: string; booking_status: string };
+type Appt = { appointment_id: number; booking_start_utc: string; booking_end_utc: string | null; service_name: string | null; google_meet_url: string | null; customer_id: number; customer_name: string; booking_status: string; is_diagnostico?: boolean };
+
+// Secciones de la HC Inicial 9.99 (diagnóstico). Orden y etiquetas según el doc oficial.
+const DIAG_IDENTITY: [string, string][] = [["edad", "Edad"], ["estado_civil", "Estado civil"], ["pais", "País"], ["ciudad", "Ciudad"]];
+const DIAG_SECTIONS: { key: string; label: string; hint: string }[] = [
+  { key: "motivo_consulta", label: "Motivo de consulta", hint: "En palabras del usuario (entrecomillado), sintomatología principal y tiempo de evolución." },
+  { key: "anamnesis", label: "Anamnesis", hint: "Antecedentes médicos, familiares, psicológicos, sociales y de desarrollo; situación actual y factores desencadenantes/de mantenimiento." },
+  { key: "evaluacion_funciones", label: "Evaluación de funciones psicológicas", hint: "Atención, memoria, lenguaje, afecto, pensamiento, juicio y conducta motora observados en sesión." },
+  { key: "impresion_diagnostica", label: "Impresión diagnóstica", hint: "Hipótesis clínica preliminar (criterios CIE/DSM)." },
+  { key: "plan_intervencion", label: "Plan de intervención", hint: "Metas y objetivos a corto/mediano plazo, técnicas para próximas sesiones." },
+  { key: "compromiso", label: "Compromiso", hint: "Tareas acordadas para el usuario entre sesiones." },
+];
 type Note = { highlights: string | null; how_went: string | null; patient_state: string | null; intervention: string | null; next_steps: string | null; homework: string | null; red_flags: string | null; attended: boolean | null; updated_at: string };
 type HistEntry = { appointment_id: number; session_date: string; highlights: string | null; how_went: string | null; attended: boolean | null };
 
@@ -19,6 +30,7 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const [appt, setAppt] = useState<Appt | null>(null);
   const [note, setNote] = useState<Note>({ highlights: "", how_went: "", patient_state: "", intervention: "", next_steps: "", homework: "", red_flags: "", attended: null, updated_at: "" });
+  const [diag, setDiag] = useState<Record<string, string>>({});
   const [history, setHistory] = useState<HistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,6 +46,7 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
       setAppt(d.appointment);
       setHistory(d.history ?? []);
       if (d.note) setNote({ highlights: d.note.highlights ?? "", how_went: d.note.how_went ?? "", patient_state: d.note.patient_state ?? "", intervention: d.note.intervention ?? "", next_steps: d.note.next_steps ?? "", homework: d.note.homework ?? "", red_flags: d.note.red_flags ?? "", attended: d.note.attended, updated_at: d.note.updated_at });
+      if (d.note?.diag_fields && typeof d.note.diag_fields === "object") setDiag(d.note.diag_fields);
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, [id]);
@@ -45,7 +58,7 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
   async function save() {
     setSaving(true); setSaved(false); setLocked(null);
     try {
-      const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...note, draft: false }) });
+      const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...note, diag_fields: diag, draft: false }) });
       if (r.ok) { setSaved(true); lastSavedRef.current = textKey; setTimeout(() => setSaved(false), 2500); return; }
       if (r.status === 423) {
         const d = await r.json();
@@ -59,7 +72,7 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
   // draft:true → no re-embebe en cada tecla; el cron embed-clinical-notes lo hace.
   const lastSavedRef = useRef<string>("");
   const [autoSaving, setAutoSaving] = useState(false);
-  const textKey = JSON.stringify([note.highlights, note.how_went, note.patient_state, note.intervention, note.next_steps, note.homework, note.red_flags]);
+  const textKey = JSON.stringify([note.highlights, note.how_went, note.patient_state, note.intervention, note.next_steps, note.homework, note.red_flags, diag]);
   useEffect(() => {
     if (loading || note.attended === false) return;
     if (lastSavedRef.current === "") { lastSavedRef.current = textKey; return; } // hidratación inicial
@@ -67,7 +80,7 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
     const t = setTimeout(async () => {
       setAutoSaving(true);
       try {
-        const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...note, draft: true }) });
+        const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...note, diag_fields: diag, draft: true }) });
         if (r.ok) lastSavedRef.current = textKey;
       } catch { /* reintenta en el próximo cambio */ } finally { setAutoSaving(false); }
     }, 1500);
@@ -189,6 +202,29 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
 
         {note.attended !== false && (
         <>
+        {appt.is_diagnostico && (
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ display: "inline-block", padding: "3px 10px", background: "rgba(106,23,140,0.1)", color: PURPLE, borderRadius: 999, fontSize: 11, fontWeight: 800, marginBottom: 12 }}>🩺 Historia Clínica Inicial · Diagnóstico 9,99€</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 12 }}>
+              {DIAG_IDENTITY.map(([k, label]) => (
+                <div key={k}>
+                  <label style={lbl}>{label}</label>
+                  <input value={diag[k] ?? ""} onChange={e => setDiag(d => ({ ...d, [k]: e.target.value }))} style={{ width: "100%", padding: "8px 10px", fontSize: 13, border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, fontFamily: "inherit", boxSizing: "border-box" }} />
+                </div>
+              ))}
+            </div>
+            {DIAG_SECTIONS.map(s => (
+              <Field key={s.key} label={s.label} hint={s.hint}>
+                <RichTextarea value={diag[s.key] ?? ""} onChange={v => setDiag(d => ({ ...d, [s.key]: v }))} minHeight={s.key === "anamnesis" ? 150 : 100} />
+              </Field>
+            ))}
+            <Field label="🚨 Red flags / alertas (si las hubo)">
+              <RichTextarea value={note.red_flags ?? ""} onChange={v => setNote({ ...note, red_flags: v })} accentDanger placeholder="Ideación suicida, autoagresión, sospecha de abuso, crisis…" minHeight={72} />
+            </Field>
+          </div>
+        )}
+        {!appt.is_diagnostico && (
+        <>
         <Field label="✨ Highlights / lo más importante (1-2 frases que recordar)" hint="Para que en próximas sesiones recuerdes lo clave al instante">
           <textarea value={note.highlights ?? ""} onChange={e => setNote({ ...note, highlights: e.target.value })} rows={2} style={ta} placeholder="Ej: avance en límites con su madre; toca consolidar la próxima sesión" />
         </Field>
@@ -217,6 +253,8 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
         <Field label="🚨 Red flags / alertas (si las hubo)">
           <RichTextarea value={note.red_flags ?? ""} onChange={v => setNote({ ...note, red_flags: v })} accentDanger placeholder="Ideación suicida, autoagresión, sospecha de abuso, crisis…" minHeight={72} />
         </Field>
+        </>
+        )}
 
         {locked && (
           <div style={{ marginTop: 14, padding: 16, background: locked.unlock_status === "pending" ? "rgba(217,119,6,0.06)" : "rgba(220,38,38,0.06)", border: `1px solid ${locked.unlock_status === "pending" ? "#d97706" : "#dc2626"}`, borderRadius: 10 }}>
