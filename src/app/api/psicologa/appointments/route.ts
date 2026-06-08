@@ -22,12 +22,17 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const range = url.searchParams.get("range") ?? "upcoming";
 
+  // Ventana de gracia: una cita en curso (o recién terminada) tiene
+  // bookingStart < NOW() y antes desaparecía de "Próximas"/"7 días" al minuto de
+  // empezar, justo cuando la psi está en sesión (reporte Barbara Pargas). Damos
+  // 2h de margen hacia atrás para que siga visible durante la sesión y mientras
+  // rellena la HC inmediatamente después.
   let whereTime = "";
   if (range === "today") whereTime = "AND DATE(a.bookingStart) = CURDATE()";
-  else if (range === "week") whereTime = "AND a.bookingStart BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)";
-  else if (range === "month") whereTime = "AND a.bookingStart BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 30 DAY)";
-  else if (range === "upcoming") whereTime = "AND a.bookingStart >= NOW()";
-  else if (range === "past") whereTime = "AND a.bookingStart < NOW()";
+  else if (range === "week") whereTime = "AND a.bookingStart BETWEEN DATE_SUB(NOW(), INTERVAL 2 HOUR) AND DATE_ADD(NOW(), INTERVAL 7 DAY)";
+  else if (range === "month") whereTime = "AND a.bookingStart BETWEEN DATE_SUB(NOW(), INTERVAL 2 HOUR) AND DATE_ADD(NOW(), INTERVAL 30 DAY)";
+  else if (range === "upcoming") whereTime = "AND a.bookingStart >= DATE_SUB(NOW(), INTERVAL 2 HOUR)";
+  else if (range === "past") whereTime = "AND a.bookingStart < DATE_SUB(NOW(), INTERVAL 2 HOUR)";
 
   const ab = ameliaTable("appointments");
   const cb = ameliaTable("customer_bookings");
