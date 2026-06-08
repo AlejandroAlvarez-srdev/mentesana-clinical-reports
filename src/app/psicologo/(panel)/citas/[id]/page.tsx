@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import PatientTasks from "../../../_components/PatientTasks";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
 import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder";
@@ -44,14 +44,35 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
   async function save() {
     setSaving(true); setSaved(false); setLocked(null);
     try {
-      const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(note) });
-      if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); return; }
+      const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...note, draft: false }) });
+      if (r.ok) { setSaved(true); lastSavedRef.current = textKey; setTimeout(() => setSaved(false), 2500); return; }
       if (r.status === 423) {
         const d = await r.json();
         setLocked({ days: d.days_since_session ?? 0, unlock_status: d.unlock_status ?? "none" });
       }
     } finally { setSaving(false); }
   }
+
+  // AUTOSAVE (borrador): persiste lo que va escribiendo sin tener que pulsar
+  // Guardar (petición de Gabriela: anotar rápido y completar después). Manda
+  // draft:true → no re-embebe en cada tecla; el cron embed-clinical-notes lo hace.
+  const lastSavedRef = useRef<string>("");
+  const [autoSaving, setAutoSaving] = useState(false);
+  const textKey = JSON.stringify([note.highlights, note.how_went, note.patient_state, note.intervention, note.next_steps, note.homework, note.red_flags]);
+  useEffect(() => {
+    if (loading || note.attended === false) return;
+    if (lastSavedRef.current === "") { lastSavedRef.current = textKey; return; } // hidratación inicial
+    if (textKey === lastSavedRef.current) return;
+    const t = setTimeout(async () => {
+      setAutoSaving(true);
+      try {
+        const r = await fetch(`/api/psicologa/appointments/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...note, draft: true }) });
+        if (r.ok) lastSavedRef.current = textKey;
+      } catch { /* reintenta en el próximo cambio */ } finally { setAutoSaving(false); }
+    }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textKey, loading, note.attended]);
 
   // Sync rápido de asistencia (sin esperar al Guardar). Esta semana la psi
   // marca asistencia desde su panel; tras 2026-06-09 vuelve a ser solo soporte.
@@ -139,7 +160,9 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
       <section id="historial" style={{ background: "#fff", borderRadius: 14, padding: 20, marginBottom: 20, border: "1px solid rgba(0,0,0,0.06)", scrollMarginTop: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
           <h2 style={{ margin: 0, fontSize: 18, color: PURPLE, fontWeight: 800 }}>📝 Historial clínico de esta sesión</h2>
-          {note.updated_at && <span style={{ fontSize: 10.5, color: "#888" }}>Guardado hace {fmtRel(note.updated_at)}</span>}
+          {autoSaving
+            ? <span style={{ fontSize: 10.5, color: PURPLE, fontWeight: 700 }}>💾 guardando borrador…</span>
+            : note.updated_at && <span style={{ fontSize: 10.5, color: "#888" }}>Guardado hace {fmtRel(note.updated_at)} · se guarda solo</span>}
         </div>
 
         <div style={{ marginBottom: 14, padding: 12, background: note.attended === null ? "rgba(245,158,11,0.06)" : note.attended === false ? "rgba(220,38,38,0.04)" : "rgba(16,185,129,0.04)", border: `1px ${note.attended === null ? "dashed" : "solid"} ${note.attended === null ? "rgba(245,158,11,0.4)" : note.attended === false ? "rgba(220,38,38,0.25)" : "rgba(16,185,129,0.25)"}`, borderRadius: 10 }}>
@@ -270,4 +293,6 @@ function pillBtn(active: boolean, color: string): React.CSSProperties {
 }
 
 const lbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 };
-const ta: React.CSSProperties = { width: "100%", padding: "10px 12px", fontSize: 13, lineHeight: 1.5, border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" };
+// minHeight más generoso + resize vertical: campos amplios y expandibles para
+// las que escriben registros largos (petición de Brenda Castillo).
+const ta: React.CSSProperties = { width: "100%", padding: "10px 12px", fontSize: 13, lineHeight: 1.6, border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", minHeight: 96 };

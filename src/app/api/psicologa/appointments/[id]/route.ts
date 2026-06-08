@@ -172,9 +172,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   // Embeb la HC para el asistente RAG (match_clinical_notes), incluyendo el
   // nombre del paciente para que la búsqueda por nombre funcione. No bloqueante:
   // si Voyage falla, la HC ya quedó guardada; embedded_at se queda null y un
-  // guardado posterior (o backfill) la embebe. Solo embebemos si hay contenido
-  // clínico real, no en un guardado de solo-asistencia.
-  try {
+  // guardado posterior (o el cron embed-clinical-notes) la embebe. Solo embebemos
+  // si hay contenido clínico real, no en un guardado de solo-asistencia.
+  // En autosave (draft:true) NO embebemos en cada tecla — el cron lo hará luego.
+  if (!body.draft) try {
     const { data: full } = await sb
       .from("psychologist_clinical_notes")
       .select("highlights, how_went, patient_state, intervention, next_steps, homework, red_flags")
