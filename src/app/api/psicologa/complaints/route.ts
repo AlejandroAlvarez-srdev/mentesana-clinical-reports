@@ -34,6 +34,12 @@ export async function POST(req: NextRequest) {
   const customer_id = body.customer_id ?? null;
   const appointment_id = body.appointment_id ?? null;
   if (!subject || subject.length < 4) return NextResponse.json({ error: "subject_required" }, { status: 400 });
+  const attachments = Array.isArray(body.attachments)
+    ? body.attachments
+        .filter((a: any) => a?.url && a?.filename)
+        .slice(0, 10)
+        .map((a: any) => ({ url: String(a.url), filename: String(a.filename).slice(0, 200), mime_type: a.mime_type ?? null, size_bytes: a.size_bytes ?? null }))
+    : null;
   const { data, error } = await sb
     .from("psychologist_complaints")
     .insert({
@@ -42,6 +48,7 @@ export async function POST(req: NextRequest) {
       subject: subject.slice(0, 200),
       description: description.slice(0, 4000) || null,
       severity, status: "open",
+      attachments: attachments && attachments.length ? attachments : null,
     })
     .select("*")
     .single();

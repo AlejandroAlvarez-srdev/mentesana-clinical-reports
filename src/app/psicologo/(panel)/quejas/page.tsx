@@ -4,7 +4,17 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 const PURPLE = "#6A178C";
-type Complaint = { id: string; subject: string; description: string | null; severity: string; status: string; admin_response: string | null; created_at: string; resolved_at: string | null };
+type Attachment = { url: string; filename: string; mime_type?: string | null; size_bytes?: number | null };
+type Complaint = { id: string; subject: string; description: string | null; severity: string; status: string; admin_response: string | null; created_at: string; resolved_at: string | null; attachments?: Attachment[] | null };
+
+async function uploadReportFile(file: File): Promise<Attachment | null> {
+  const r = await fetch("/api/psicologa/complaints/upload", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: file.name }) });
+  if (!r.ok) return null;
+  const { signedUrl, publicUrl } = await r.json();
+  const up = await fetch(signedUrl, { method: "PUT", body: file, headers: { "x-upsert": "true", "Content-Type": file.type || "application/octet-stream" } });
+  if (!up.ok) return null;
+  return { url: publicUrl, filename: file.name, mime_type: file.type, size_bytes: file.size };
+}
 
 const SEV_META: Record<string, { color: string; emoji: string }> = {
   baja: { color: "#64748b", emoji: "ℹ️" },
@@ -27,6 +37,7 @@ function QuejasInner() {
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [severity, setSeverity] = useState<"baja" | "media" | "alta" | "urgente">("media");
+  const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [list, setList] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,13 +54,15 @@ function QuejasInner() {
     if (!subject.trim()) return;
     setSaving(true);
     try {
+      const uploaded: Attachment[] = [];
+      for (const f of files) { const u = await uploadReportFile(f); if (u) uploaded.push(u); }
       const r = await fetch("/api/psicologa/complaints", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, description, severity, customer_id: cidParam ? Number(cidParam) : null, appointment_id: apptParam ? Number(apptParam) : null }),
+        body: JSON.stringify({ subject, description, severity, attachments: uploaded, customer_id: cidParam ? Number(cidParam) : null, appointment_id: apptParam ? Number(apptParam) : null }),
       });
       if (r.ok) {
-        setSubject(""); setDescription(""); setSeverity("media");
+        setSubject(""); setDescription(""); setSeverity("media"); setFiles([]);
         setShowForm(false);
         void load();
       }
@@ -81,6 +94,19 @@ function QuejasInner() {
               ))}
             </div>
           </Field>
+          <Field label="Adjuntos (opcional)">
+            <label style={{ display: "inline-block", padding: "6px 12px", background: "#fff", border: `1px dashed ${PURPLE}`, borderRadius: 6, fontSize: 11.5, fontWeight: 700, color: PURPLE, cursor: "pointer" }}>
+              📎 Adjuntar archivos
+              <input type="file" multiple onChange={e => setFiles(Array.from(e.target.files ?? []))} style={{ display: "none" }} />
+            </label>
+            {files.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                {files.map((f, i) => (
+                  <span key={i} style={{ padding: "3px 8px", background: "rgba(106,23,140,0.1)", color: PURPLE, borderRadius: 4, fontSize: 10.5, fontWeight: 600 }}>{f.name} <button onClick={() => setFiles(files.filter((_, j) => j !== i))} style={{ marginLeft: 4, background: "none", border: "none", color: PURPLE, cursor: "pointer" }}>×</button></span>
+                ))}
+              </div>
+            )}
+          </Field>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
             <button onClick={() => setShowForm(false)} style={{ padding: "8px 14px", background: "#fff", color: "#475569", border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
             <button onClick={() => void submit()} disabled={!subject.trim() || saving} style={{ padding: "8px 18px", background: `linear-gradient(135deg, ${PURPLE}, #8B2FB5)`, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: !subject.trim() || saving ? 0.5 : 1 }}>{saving ? "Enviando…" : "📨 Enviar al jefe"}</button>
@@ -105,6 +131,13 @@ function QuejasInner() {
                 </div>
               </div>
               {c.description && <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "#475569", lineHeight: 1.5 }}>{c.description}</p>}
+              {c.attachments && c.attachments.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  {c.attachments.map((a, i) => (
+                    <a key={i} href={a.url} target="_blank" rel="noreferrer" style={{ padding: "3px 8px", background: "rgba(106,23,140,0.08)", color: PURPLE, borderRadius: 4, fontSize: 10.5, fontWeight: 600, textDecoration: "none" }}>📎 {a.filename}</a>
+                  ))}
+                </div>
+              )}
               {c.admin_response && (
                 <div style={{ marginTop: 10, padding: 10, background: "rgba(106,23,140,0.04)", borderRadius: 8, borderLeft: `3px solid ${PURPLE}` }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: PURPLE, textTransform: "uppercase", marginBottom: 3 }}>Respuesta del jefe</div>
