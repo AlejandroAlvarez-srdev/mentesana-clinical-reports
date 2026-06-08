@@ -2,6 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import PatientTasks from "../../../_components/PatientTasks";
+import { RichTextarea, renderMarkdown } from "../../../_components/RichTextarea";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
 import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder";
 import Link from "next/link";
@@ -148,8 +149,8 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
                   {h.highlights && <span style={{ fontWeight: 500, color: "#666", marginLeft: 8, fontSize: 11.5 }}>· {h.highlights.slice(0, 80)}</span>}
                 </summary>
                 <div style={{ padding: "0 14px 14px", fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
-                  {h.highlights && <div style={{ marginBottom: 6 }}><strong>Highlights:</strong> {h.highlights}</div>}
-                  {h.how_went && <div><strong>Cómo fue:</strong> {h.how_went}</div>}
+                  {h.highlights && <div style={{ marginBottom: 6 }}><strong>Highlights:</strong> {renderMarkdown(h.highlights)}</div>}
+                  {h.how_went && <div><strong>Cómo fue:</strong> {renderMarkdown(h.how_went)}</div>}
                 </div>
               </details>
             ))}
@@ -192,29 +193,29 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
           <textarea value={note.highlights ?? ""} onChange={e => setNote({ ...note, highlights: e.target.value })} rows={2} style={ta} placeholder="Ej: avance en límites con su madre; toca consolidar la próxima sesión" />
         </Field>
 
-        <Field label="💬 ¿Cómo ha ido la sesión?" hint="Tu narrativa libre de cómo fue el encuentro">
-          <textarea value={note.how_went ?? ""} onChange={e => setNote({ ...note, how_went: e.target.value })} rows={4} style={ta} />
+        <Field label="💬 ¿Cómo ha ido la sesión?" hint="Tu narrativa libre. Usa **negrita**, *cursiva* o viñetas para resaltar (p.ej. resultados de tests)">
+          <RichTextarea value={note.how_went ?? ""} onChange={v => setNote({ ...note, how_went: v })} minHeight={130} />
         </Field>
 
         <Field label="🎭 Estado del paciente">
-          <textarea value={note.patient_state ?? ""} onChange={e => setNote({ ...note, patient_state: e.target.value })} rows={2} style={ta} placeholder="Estado emocional, mood, energía, postura…" />
+          <RichTextarea value={note.patient_state ?? ""} onChange={v => setNote({ ...note, patient_state: v })} placeholder="Estado emocional, mood, energía, postura…" />
         </Field>
 
         <Field label="🛠️ Intervención clínica realizada">
-          <textarea value={note.intervention ?? ""} onChange={e => setNote({ ...note, intervention: e.target.value })} rows={3} style={ta} placeholder="Técnicas usadas, ejercicios, modelo terapéutico aplicado" />
+          <RichTextarea value={note.intervention ?? ""} onChange={v => setNote({ ...note, intervention: v })} placeholder="Técnicas usadas, ejercicios, modelo terapéutico aplicado" />
         </Field>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="🎯 Plan próxima sesión">
-            <textarea value={note.next_steps ?? ""} onChange={e => setNote({ ...note, next_steps: e.target.value })} rows={3} style={ta} />
+            <RichTextarea value={note.next_steps ?? ""} onChange={v => setNote({ ...note, next_steps: v })} />
           </Field>
           <Field label="📚 Tareas para casa">
-            <textarea value={note.homework ?? ""} onChange={e => setNote({ ...note, homework: e.target.value })} rows={3} style={ta} />
+            <RichTextarea value={note.homework ?? ""} onChange={v => setNote({ ...note, homework: v })} />
           </Field>
         </div>
 
         <Field label="🚨 Red flags / alertas (si las hubo)">
-          <textarea value={note.red_flags ?? ""} onChange={e => setNote({ ...note, red_flags: e.target.value })} rows={2} style={{ ...ta, borderColor: note.red_flags ? "#fecaca" : "rgba(0,0,0,0.1)" }} placeholder="Ideación suicida, autoagresión, sospecha de abuso, crisis…" />
+          <RichTextarea value={note.red_flags ?? ""} onChange={v => setNote({ ...note, red_flags: v })} accentDanger placeholder="Ideación suicida, autoagresión, sospecha de abuso, crisis…" minHeight={72} />
         </Field>
 
         {locked && (
