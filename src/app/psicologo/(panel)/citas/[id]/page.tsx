@@ -26,6 +26,15 @@ type HistEntry = { appointment_id: number; session_date: string; highlights: str
 
 function fmt(iso: string) { return new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso)); }
 
+// Asistencia derivada del estado real de Amelia cuando la psi aún no marcó nada
+// en su nota. Semántica Mente Sana: pending=ASISTIÓ, no-show/rejected=NO asistió,
+// approved=agendada/pendiente, canceled=cancelada.
+function derivAttended(status?: string): boolean | null {
+  if (status === "pending") return true;
+  if (status === "no-show" || status === "rejected") return false;
+  return null;
+}
+
 export default function CitaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [appt, setAppt] = useState<Appt | null>(null);
@@ -45,7 +54,10 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
       const d = await r.json();
       setAppt(d.appointment);
       setHistory(d.history ?? []);
-      if (d.note) setNote({ highlights: d.note.highlights ?? "", how_went: d.note.how_went ?? "", patient_state: d.note.patient_state ?? "", intervention: d.note.intervention ?? "", next_steps: d.note.next_steps ?? "", homework: d.note.homework ?? "", red_flags: d.note.red_flags ?? "", attended: d.note.attended, updated_at: d.note.updated_at });
+      // Si la psi no marcó asistencia en su nota, la derivamos del estado real de
+      // Amelia (soporte ya pudo marcarla) → fin de "veo Pendiente aunque asistió".
+      const derivedAtt = typeof d.note?.attended === "boolean" ? d.note.attended : derivAttended(d.appointment?.booking_status);
+      setNote({ highlights: d.note?.highlights ?? "", how_went: d.note?.how_went ?? "", patient_state: d.note?.patient_state ?? "", intervention: d.note?.intervention ?? "", next_steps: d.note?.next_steps ?? "", homework: d.note?.homework ?? "", red_flags: d.note?.red_flags ?? "", attended: derivedAtt, updated_at: d.note?.updated_at ?? "" });
       if (d.note?.diag_fields && typeof d.note.diag_fields === "object") setDiag(d.note.diag_fields);
     } finally { setLoading(false); }
   }

@@ -8,6 +8,14 @@ import MeetLinkWithCCReminder from "../../_components/MeetLinkWithCCReminder";
 const PURPLE = "#6A178C";
 type Appt = { appointment_id: number; booking_start_utc: string; customer_name: string; service_name: string | null; google_meet_url: string | null; has_clinical_note: boolean; attended: boolean | null; booking_status: string; clinical_highlights: string | null };
 
+// Asistencia derivada del estado de Amelia (pending=ASISTIÓ, no-show/rejected=NO,
+// approved=agendada/pendiente) cuando la psi aún no la marcó en su nota.
+function derivAttended(status?: string): boolean | null {
+  if (status === "pending") return true;
+  if (status === "no-show" || status === "rejected") return false;
+  return null;
+}
+
 export default function CitasPage() {
   const [range, setRange] = useState<"upcoming" | "today" | "week" | "past">("upcoming");
   const [data, setData] = useState<Appt[]>([]);
@@ -64,7 +72,7 @@ export default function CitasPage() {
                       <MeetLinkWithCCReminder href={a.google_meet_url} />
                     )}
                     {a.booking_status !== "canceled" && (
-                      <AttendanceQuick appointmentId={a.appointment_id} initial={a.attended ?? null} compact />
+                      <AttendanceQuick appointmentId={a.appointment_id} initial={a.attended ?? derivAttended(a.booking_status)} compact />
                     )}
                     <Link href={`/psicologo/citas/${a.appointment_id}`} title={a.has_clinical_note ? "Ver/editar nota clínica" : "✍️ Escribir nota clínica"} style={{ fontSize: 11, padding: "5px 10px", background: a.has_clinical_note ? "rgba(16,185,129,0.14)" : "rgba(245,158,11,0.14)", color: a.has_clinical_note ? "#065f46" : "#92400e", borderRadius: 8, fontWeight: 800, textDecoration: "none", whiteSpace: "nowrap", border: a.has_clinical_note ? "1px solid rgba(16,185,129,0.3)" : "1px dashed rgba(245,158,11,0.4)" }}>
                       {a.has_clinical_note ? "✓ HC" : "✍️ + HC"}

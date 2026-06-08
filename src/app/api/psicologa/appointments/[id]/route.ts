@@ -178,7 +178,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   let amelia_synced = false;
   let amelia_error: string | null = null;
   if (typeof body.attended === "boolean") {
-    const newStatus = body.attended ? "approved" : "no-show";
+    // Semántica Mente Sana: pending = ASISTIÓ, no-show = NO asistió. (approved =
+    // agendada/pendiente, NO asistió — por eso NO usamos 'approved' aquí.)
+    const newStatus = body.attended ? "pending" : "no-show";
     try {
       const r = await ameliaExec(
         `UPDATE ${ameliaTable("customer_bookings")} SET status = ? WHERE appointmentId = ? AND status NOT IN ('canceled','rejected')`,
