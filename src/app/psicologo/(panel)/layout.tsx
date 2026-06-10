@@ -111,34 +111,38 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           </div>
         </div>
       </header>
-      {/* Barrita sticky de rendimiento (15px): manuscrita (Caveat), fondo semáforo */}
+      {/* Barrita sticky de rendimiento — delgada y delicada: fondo pastel del
+          semáforo, texto Caveat en el color, y línea de progreso (nota/5) abajo. */}
       <div
         className="font-handwriting"
         style={{
           position: "sticky",
           top: 62,
           zIndex: 45,
-          height: 15,
+          height: 19,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 6,
-          background: `linear-gradient(90deg, ${rating.color}e6 0%, ${rating.color} 35%, ${rating.color} 65%, ${rating.color}e6 100%)`,
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 8px ${rating.color}33`,
-          color: "#fff",
-          fontSize: 15,
-          fontWeight: 600,
-          letterSpacing: 0.3,
+          gap: 8,
+          background: rating.bg,
+          borderBottom: `1px solid ${rating.color}22`,
+          color: rating.color,
+          fontSize: 15.5,
+          lineHeight: 1,
+          fontWeight: 700,
           whiteSpace: "nowrap",
-          overflow: "hidden",
         }}
         title={`Tu calificación media de pacientes: ${rating.stars.toFixed(1)}/5`}
       >
-        <span style={{ fontSize: 8, opacity: 0.9 }}>✦</span>
-        tu calificación: {rating.stars.toFixed(1)} de 5
-        <span style={{ fontSize: 8, opacity: 0.9 }}>✦</span>
-        {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "paciente te ha valorado" : "pacientes te han valorado"}`}
-        <span style={{ fontSize: 8, opacity: 0.9 }}>✦</span>
+        <span style={{ fontSize: 9, opacity: 0.7, lineHeight: 1 }}>✦</span>
+        <span style={{ paddingTop: 1 }}>
+          tu calificación: <strong style={{ fontWeight: 700 }}>{rating.stars.toFixed(1)} de 5</strong>
+          {" — "}
+          {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "paciente te ha valorado" : "pacientes te han valorado"}`}
+        </span>
+        <span style={{ fontSize: 9, opacity: 0.7, lineHeight: 1 }}>✦</span>
+        {/* línea de progreso: cuánto de 5 */}
+        <span aria-hidden style={{ position: "absolute", left: 0, bottom: 0, height: 2, width: `${Math.min(100, (rating.stars / 5) * 100)}%`, background: `linear-gradient(90deg, ${rating.color}66, ${rating.color})`, borderRadius: 2 }} />
       </div>
       {p.is_supervisor && (
         <div style={{ background: "linear-gradient(135deg, #6A178C, #8B2FB5)", color: "#fff", padding: "8px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
