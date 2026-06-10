@@ -33,6 +33,25 @@ const nav = [
   { href: "/psicologo/quejas", label: "Reportes al jefe", emoji: "💬" },
 ];
 
+// Calificación de pacientes (session_reviews · NPS 0-10 → estrellas 0-5).
+// Verde ≥4.5, amarillo ≥3.5, rojo por debajo. null si aún no tiene reviews.
+async function loadRating(providerId: number): Promise<{ stars: number; count: number; color: string; bg: string } | null> {
+  try {
+    const { sbBlog } = await import("@/lib/psicologa-extension");
+    const { data } = await sbBlog()
+      .from("session_reviews")
+      .select("nps")
+      .eq("provider_id", providerId);
+    if (!data || data.length === 0) return null;
+    const avg = data.reduce((s, r) => s + Number(r.nps), 0) / data.length;
+    const stars = Math.round((avg / 2) * 10) / 10; // 0-10 → 0-5, un decimal
+    const [color, bg] = stars >= 4.5 ? ["#166534", "#dcfce7"] : stars >= 3.5 ? ["#92400e", "#fef3c7"] : ["#991b1b", "#fee2e2"];
+    return { stars, count: data.length, color, bg };
+  } catch {
+    return null;
+  }
+}
+
 async function loadAvatar(providerId: number): Promise<string | null> {
   try {
     const { ameliaQuery, ameliaTable } = await import("@/lib/amelia-db");
@@ -61,6 +80,7 @@ export default async function PsicologaLayout({ children }: { children: React.Re
   }
   const initials = (p.first_name?.[0] ?? "") + (p.last_name?.[0] ?? "");
   const avatar = await loadAvatar(p.provider_id);
+  const rating = await loadRating(p.provider_id);
 
   return (
     <div data-panel-psi style={{ minHeight: "100vh", background: "#FFFAF2", fontFamily: "Inter, sans-serif" }}>
@@ -78,6 +98,15 @@ export default async function PsicologaLayout({ children }: { children: React.Re
             ))}
           </nav>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {rating && (
+              <span
+                title={`Tu calificación media de pacientes: ${rating.stars}/5 basada en ${rating.count} ${rating.count === 1 ? "valoración" : "valoraciones"}`}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 999, background: rating.bg, color: rating.color, fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap", border: `1px solid ${rating.color}22` }}
+              >
+                ⭐ {rating.stars.toFixed(1)}
+                <span style={{ fontWeight: 600, fontSize: 10.5, opacity: 0.85 }}>· {rating.count} {rating.count === 1 ? "valoración" : "valoraciones"}</span>
+              </span>
+            )}
             <NotificationBell api="/api/psicologa/notifications" />
             {avatar ? (
               <img src={avatar} alt={p.name} title={p.email} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${PURPLE}` }} />
