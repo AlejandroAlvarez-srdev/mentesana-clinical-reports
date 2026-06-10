@@ -98,15 +98,6 @@ export default async function PsicologaLayout({ children }: { children: React.Re
             ))}
           </nav>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {rating && (
-              <span
-                title={`Tu calificación media de pacientes: ${rating.stars}/5 basada en ${rating.count} ${rating.count === 1 ? "valoración" : "valoraciones"}`}
-                style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 999, background: rating.bg, color: rating.color, fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap", border: `1px solid ${rating.color}22` }}
-              >
-                ⭐ {rating.stars.toFixed(1)}
-                <span style={{ fontWeight: 600, fontSize: 10.5, opacity: 0.85 }}>· {rating.count} {rating.count === 1 ? "valoración" : "valoraciones"}</span>
-              </span>
-            )}
             <NotificationBell api="/api/psicologa/notifications" />
             {avatar ? (
               <img src={avatar} alt={p.name} title={p.email} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${PURPLE}` }} />
@@ -126,6 +117,54 @@ export default async function PsicologaLayout({ children }: { children: React.Re
         </div>
       )}
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>{children}</main>
+      {/* Badge flotante de calificación — tipo burbuja de chat, fijo abajo-izquierda,
+          la sigue por todo el panel. Semáforo: verde ≥4.5 · amarillo ≥3.5 · rojo. */}
+      {rating && (
+        <div
+          title={`Tu calificación media de pacientes: ${rating.stars.toFixed(1)}/5 basada en ${rating.count} ${rating.count === 1 ? "valoración" : "valoraciones"}`}
+          style={{
+            position: "fixed",
+            bottom: 20,
+            left: 20,
+            zIndex: 90,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "10px 16px 10px 12px",
+            borderRadius: 999,
+            background: "#fff",
+            border: `2px solid ${rating.color}`,
+            boxShadow: `0 10px 30px ${rating.color}40, 0 4px 12px rgba(0,0,0,0.08)`,
+            cursor: "default",
+          }}
+        >
+          <span
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: rating.bg,
+              color: rating.color,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 15,
+              fontWeight: 900,
+              flexShrink: 0,
+            }}
+          >
+            ⭐
+          </span>
+          <span style={{ lineHeight: 1.15 }}>
+            <span style={{ display: "block", fontSize: 17, fontWeight: 900, color: rating.color }}>
+              {rating.stars.toFixed(1)}<span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}> / 5</span>
+            </span>
+            <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, color: "#64748b" }}>
+              {rating.count} {rating.count === 1 ? "valoración" : "valoraciones"} de pacientes
+            </span>
+          </span>
+        </div>
+      )}
       {/* ExtensionWatchdog desactivado 2026-06-01 — generaba demasiados
           falsos positivos echando psicólogas del CRM. Gate único en SSR
           con hasPairedExtension() de arriba: una vez pareada, no se
