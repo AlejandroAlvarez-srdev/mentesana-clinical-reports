@@ -18,10 +18,19 @@ export async function POST(req: NextRequest) {
   const v = verifyDeviceToken(token);
   if (!v) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: CORS });
 
+  // La columna version solo se escribía al parear, así que un auto-update del
+  // Web Store era invisible (filas decían 0.1.0 corriendo 0.3.x). Si la extensión
+  // manda su versión en el heartbeat, la persistimos — con eso medimos la
+  // propagación real antes de bajar HEARTBEAT_WINDOW_MS.
+  const body = await req.json().catch(() => ({}) as any);
+  const version = typeof body.version === "string" && body.version.trim() ? body.version.trim().slice(0, 32) : null;
+  const patch: Record<string, string> = { last_seen_at: new Date().toISOString() };
+  if (version) patch.version = version;
+
   const sb = sbBlog();
   const { error } = await sb
     .from("psicologa_extensions")
-    .update({ last_seen_at: new Date().toISOString() })
+    .update(patch)
     .eq("provider_id", v.providerId).eq("device_id", v.deviceId).is("revoked_at", null);
   if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: CORS });
   return NextResponse.json({ ok: true }, { headers: CORS });
