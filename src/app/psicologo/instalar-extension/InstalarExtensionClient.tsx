@@ -86,7 +86,7 @@ export default function InstalarExtensionClient({ name, forced = false }: { name
 
             {forced && (
               <div style={{ background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: 10, padding: 14, fontSize: 12.5, color: "#92400E", marginBottom: 10 }}>
-                ⚙️ <b>Modo re-vinculación:</b> ya tienes una versión de la extensión activa. Si vas a actualizar a la nueva versión (v0.2.0), primero quítala desde <code style={{ background: "#fff", padding: "1px 5px", borderRadius: 3 }}>chrome://extensions</code> y luego instala la nueva. Después pega aquí el código.
+                ⚙️ <b>Modo re-vinculación:</b> ya tienes una versión de la extensión activa. La extensión se actualiza sola desde Chrome Web Store (última versión: v0.3.0) — no hace falta quitarla ni reinstalar. Solo pega aquí el código para volver a vincularla.
               </div>
             )}
             <div style={{ background: "#FAF5FF", border: `2px dashed ${PURPLE}`, borderRadius: 12, padding: 24, textAlign: "center", marginTop: 12 }}>
