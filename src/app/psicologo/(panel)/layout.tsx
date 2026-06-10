@@ -111,8 +111,9 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           </div>
         </div>
       </header>
-      {/* Barrita sticky de rendimiento (≤15px): mismo dato del badge, fondo semáforo */}
+      {/* Barrita sticky de rendimiento (15px): manuscrita (Caveat), fondo semáforo */}
       <div
+        className="font-handwriting"
         style={{
           position: "sticky",
           top: 62,
@@ -121,18 +122,23 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: `linear-gradient(90deg, ${rating.color} 0%, ${rating.color}cc 50%, ${rating.color} 100%)`,
+          gap: 6,
+          background: `linear-gradient(90deg, ${rating.color}e6 0%, ${rating.color} 35%, ${rating.color} 65%, ${rating.color}e6 100%)`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 8px ${rating.color}33`,
           color: "#fff",
-          fontSize: 9.5,
-          fontWeight: 800,
-          letterSpacing: 0.6,
-          textTransform: "uppercase",
+          fontSize: 15,
+          fontWeight: 600,
+          letterSpacing: 0.3,
           whiteSpace: "nowrap",
           overflow: "hidden",
         }}
         title={`Tu calificación media de pacientes: ${rating.stars.toFixed(1)}/5`}
       >
-        ⭐ {rating.stars.toFixed(1)} / 5 · {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "valoración" : "valoraciones"} de pacientes`}
+        <span style={{ fontSize: 8, opacity: 0.9 }}>✦</span>
+        tu calificación: {rating.stars.toFixed(1)} de 5
+        <span style={{ fontSize: 8, opacity: 0.9 }}>✦</span>
+        {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "paciente te ha valorado" : "pacientes te han valorado"}`}
+        <span style={{ fontSize: 8, opacity: 0.9 }}>✦</span>
       </div>
       {p.is_supervisor && (
         <div style={{ background: "linear-gradient(135deg, #6A178C, #8B2FB5)", color: "#fff", padding: "8px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
