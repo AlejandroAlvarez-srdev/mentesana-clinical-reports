@@ -165,48 +165,41 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           display: "flex",
           alignItems: "center",
           gap: 12,
-          padding: "12px 18px 12px 14px",
-          borderRadius: 20,
-          background: "rgba(255,255,255,0.92)",
-          backdropFilter: "blur(14px) saturate(1.6)",
-          WebkitBackdropFilter: "blur(14px) saturate(1.6)",
-          border: "1px solid rgba(255,255,255,0.7)",
-          boxShadow: `0 18px 44px ${rating.color}38, 0 2px 8px rgba(26,10,31,0.08), inset 0 1px 0 rgba(255,255,255,0.9)`,
+          padding: "10px 18px 10px 10px",
+          borderRadius: 999,
+          background: "#fff",
+          border: "1px solid rgba(26,10,31,0.06)",
+          boxShadow: "0 16px 40px rgba(26,10,31,0.14), 0 3px 10px rgba(26,10,31,0.06)",
           cursor: "default",
         }}
       >
-        <span
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            background: `linear-gradient(135deg, ${rating.color} 0%, ${rating.color}bb 100%)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            boxShadow: `0 8px 18px ${rating.color}55`,
-          }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
-            <path d="M12 2l2.92 6.26 6.58.84-4.84 4.7 1.24 6.6L12 17.27 6.1 20.4l1.24-6.6L2.5 9.1l6.58-.84L12 2z" />
+        {/* Anillo de progreso (nota/5) con el número dentro */}
+        <span style={{ position: "relative", width: 52, height: 52, flexShrink: 0 }}>
+          <svg width="52" height="52" viewBox="0 0 52 52" style={{ transform: "rotate(-90deg)" }} aria-hidden="true">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="#f0edf3" strokeWidth="5" />
+            <circle
+              cx="26" cy="26" r="22" fill="none"
+              stroke={rating.color} strokeWidth="5" strokeLinecap="round"
+              strokeDasharray={`${(rating.stars / 5) * 138.2} 138.2`}
+            />
           </svg>
+          <span style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+            <span style={{ fontSize: 15, fontWeight: 900, color: "#1a0a1f", letterSpacing: "-0.03em" }}>{rating.stars.toFixed(1)}</span>
+          </span>
         </span>
         <span style={{ lineHeight: 1 }}>
-          <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-            <span style={{ fontSize: 21, fontWeight: 900, color: "#1a0a1f", letterSpacing: "-0.03em" }}>
-              {rating.stars.toFixed(1)}
-            </span>
-            <span style={{ display: "inline-flex", gap: 1.5 }}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill={i <= Math.round(rating.stars) ? rating.color : "#e2e0e6"} aria-hidden="true">
-                  <path d="M12 2l2.92 6.26 6.58.84-4.84 4.7 1.24 6.6L12 17.27 6.1 20.4l1.24-6.6L2.5 9.1l6.58-.84L12 2z" />
-                </svg>
-              ))}
-            </span>
+          <span className="font-handwriting" style={{ display: "block", fontSize: 17, color: PURPLE, lineHeight: 1 }}>
+            tu calificación
           </span>
-          <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, color: "#8a8595", marginTop: 5, letterSpacing: 0.1 }}>
-            {rating.count === 0 ? "Tu calificación · aún sin valoraciones" : `Tu calificación · ${rating.count} ${rating.count === 1 ? "paciente" : "pacientes"}`}
+          <span style={{ display: "inline-flex", gap: 2, marginTop: 5 }}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill={i <= Math.round(rating.stars) ? "#D4AF37" : "#e7e3ea"} aria-hidden="true">
+                <path d="M12 2l2.92 6.26 6.58.84-4.84 4.7 1.24 6.6L12 17.27 6.1 20.4l1.24-6.6L2.5 9.1l6.58-.84L12 2z" />
+              </svg>
+            ))}
+          </span>
+          <span style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#9a93a5", marginTop: 4 }}>
+            {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "paciente" : "pacientes"}`}
           </span>
         </span>
       </div>
