@@ -34,21 +34,22 @@ const nav = [
 ];
 
 // Calificación de pacientes (session_reviews · NPS 0-10 → estrellas 0-5).
-// Verde ≥4.5, amarillo ≥3.5, rojo por debajo. null si aún no tiene reviews.
-async function loadRating(providerId: number): Promise<{ stars: number; count: number; color: string; bg: string } | null> {
+// Verde ≥4.5, amarillo ≥3.5, rojo por debajo. SIEMPRE visible: sin reviews → 5.0 verde.
+async function loadRating(providerId: number): Promise<{ stars: number; count: number; color: string; bg: string }> {
+  const DEFAULT = { stars: 5, count: 0, color: "#166534", bg: "#dcfce7" };
   try {
     const { sbBlog } = await import("@/lib/psicologa-extension");
     const { data } = await sbBlog()
       .from("session_reviews")
       .select("nps")
       .eq("provider_id", providerId);
-    if (!data || data.length === 0) return null;
+    if (!data || data.length === 0) return DEFAULT;
     const avg = data.reduce((s, r) => s + Number(r.nps), 0) / data.length;
     const stars = Math.round((avg / 2) * 10) / 10; // 0-10 → 0-5, un decimal
     const [color, bg] = stars >= 4.5 ? ["#166534", "#dcfce7"] : stars >= 3.5 ? ["#92400e", "#fef3c7"] : ["#991b1b", "#fee2e2"];
     return { stars, count: data.length, color, bg };
   } catch {
-    return null;
+    return DEFAULT;
   }
 }
 
@@ -119,9 +120,9 @@ export default async function PsicologaLayout({ children }: { children: React.Re
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "20px" }}>{children}</main>
       {/* Badge flotante de calificación — tipo burbuja de chat, fijo abajo-izquierda,
           la sigue por todo el panel. Semáforo: verde ≥4.5 · amarillo ≥3.5 · rojo. */}
-      {rating && (
+      {(
         <div
-          title={`Tu calificación media de pacientes: ${rating.stars.toFixed(1)}/5 basada en ${rating.count} ${rating.count === 1 ? "valoración" : "valoraciones"}`}
+          title={rating.count === 0 ? "Tu calificación de pacientes — empieza en 5.0 y se actualiza con cada valoración" : `Tu calificación media de pacientes: ${rating.stars.toFixed(1)}/5 basada en ${rating.count} ${rating.count === 1 ? "valoración" : "valoraciones"}`}
           style={{
             position: "fixed",
             bottom: 20,
@@ -160,7 +161,7 @@ export default async function PsicologaLayout({ children }: { children: React.Re
               {rating.stars.toFixed(1)}<span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}> / 5</span>
             </span>
             <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, color: "#64748b" }}>
-              {rating.count} {rating.count === 1 ? "valoración" : "valoraciones"} de pacientes
+              {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "valoración" : "valoraciones"} de pacientes`}
             </span>
           </span>
         </div>
