@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { Poppins } from "next/font/google";
+
+const poppins = Poppins({ subsets: ["latin"], weight: ["500", "600"], display: "swap" });
 import { getPsicologa } from "@/lib/psicologa-auth";
 import { hasPairedExtension } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
@@ -111,38 +114,43 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           </div>
         </div>
       </header>
-      {/* Barrita sticky de rendimiento — delgada y delicada: fondo pastel del
-          semáforo, texto Caveat en el color, y línea de progreso (nota/5) abajo. */}
+      {/* Barrita sticky de rendimiento — liquid glass: translúcida con blur,
+          tinte del semáforo, Poppins, y línea de progreso (nota/5) abajo. */}
       <div
-        className="font-handwriting"
+        className={poppins.className}
         style={{
           position: "sticky",
           top: 62,
           zIndex: 45,
-          height: 19,
+          height: 20,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 8,
-          background: rating.bg,
-          borderBottom: `1px solid ${rating.color}22`,
+          gap: 7,
+          background: `linear-gradient(180deg, ${rating.color}1f 0%, ${rating.color}0d 100%)`,
+          backdropFilter: "blur(18px) saturate(1.8)",
+          WebkitBackdropFilter: "blur(18px) saturate(1.8)",
+          borderBottom: `1px solid ${rating.color}1a`,
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55)",
           color: rating.color,
-          fontSize: 15.5,
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: 0.4,
           lineHeight: 1,
-          fontWeight: 700,
           whiteSpace: "nowrap",
         }}
         title={`Tu calificación media de pacientes: ${rating.stars.toFixed(1)}/5`}
       >
-        <span style={{ fontSize: 9, opacity: 0.7, lineHeight: 1 }}>✦</span>
-        <span style={{ paddingTop: 1 }}>
-          tu calificación: <strong style={{ fontWeight: 700 }}>{rating.stars.toFixed(1)} de 5</strong>
-          {" — "}
+        <svg width="9" height="9" viewBox="0 0 24 24" fill={rating.color} aria-hidden="true" style={{ opacity: 0.85 }}>
+          <path d="M12 2l2.92 6.26 6.58.84-4.84 4.7 1.24 6.6L12 17.27 6.1 20.4l1.24-6.6L2.5 9.1l6.58-.84L12 2z" />
+        </svg>
+        <span>
+          Tu calificación <strong style={{ fontWeight: 600 }}>{rating.stars.toFixed(1)} de 5</strong>
+          <span style={{ opacity: 0.55, margin: "0 6px" }}>·</span>
           {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "paciente te ha valorado" : "pacientes te han valorado"}`}
         </span>
-        <span style={{ fontSize: 9, opacity: 0.7, lineHeight: 1 }}>✦</span>
         {/* línea de progreso: cuánto de 5 */}
-        <span aria-hidden style={{ position: "absolute", left: 0, bottom: 0, height: 2, width: `${Math.min(100, (rating.stars / 5) * 100)}%`, background: `linear-gradient(90deg, ${rating.color}66, ${rating.color})`, borderRadius: 2 }} />
+        <span aria-hidden style={{ position: "absolute", left: 0, bottom: 0, height: 2, width: `${Math.min(100, (rating.stars / 5) * 100)}%`, background: `linear-gradient(90deg, ${rating.color}55, ${rating.color})`, borderRadius: 2 }} />
       </div>
       {p.is_supervisor && (
         <div style={{ background: "linear-gradient(135deg, #6A178C, #8B2FB5)", color: "#fff", padding: "8px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
