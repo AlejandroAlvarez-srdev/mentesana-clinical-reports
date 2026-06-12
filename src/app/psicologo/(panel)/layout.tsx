@@ -122,30 +122,31 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           position: "sticky",
           top: 62,
           zIndex: 45,
-          height: 20,
+          height: 36,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 7,
+          gap: 10,
           background: `linear-gradient(180deg, ${rating.color}1f 0%, ${rating.color}0d 100%)`,
           backdropFilter: "blur(18px) saturate(1.8)",
           WebkitBackdropFilter: "blur(18px) saturate(1.8)",
           borderBottom: `1px solid ${rating.color}1a`,
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55)",
           color: rating.color,
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: 0.4,
+          fontSize: 14,
+          fontWeight: 700,
+          letterSpacing: 0.2,
           lineHeight: 1,
           whiteSpace: "nowrap",
+          textShadow: "0 1px 0 rgba(255,255,255,0.6)",
         }}
         title={`Tu calificación media de pacientes: ${rating.stars.toFixed(1)}/5`}
       >
-        <svg width="9" height="9" viewBox="0 0 24 24" fill={rating.color} aria-hidden="true" style={{ opacity: 0.85 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill={rating.color} aria-hidden="true" style={{ opacity: 0.95 }}>
           <path d="M12 2l2.92 6.26 6.58.84-4.84 4.7 1.24 6.6L12 17.27 6.1 20.4l1.24-6.6L2.5 9.1l6.58-.84L12 2z" />
         </svg>
         <span>
-          Tu calificación <strong style={{ fontWeight: 600 }}>{rating.stars.toFixed(1)} de 5</strong>
+          Tu calificación <strong style={{ fontWeight: 800 }}>{rating.stars.toFixed(1)} de 5</strong>
           <span style={{ opacity: 0.55, margin: "0 6px" }}>·</span>
           {rating.count === 0 ? "aún sin valoraciones" : `${rating.count} ${rating.count === 1 ? "paciente te ha valorado" : "pacientes te han valorado"}`}
         </span>
