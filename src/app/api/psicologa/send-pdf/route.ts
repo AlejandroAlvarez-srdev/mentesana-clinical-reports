@@ -1,9 +1,11 @@
 // Psicóloga reenvía el PDF diagnóstico al correo del paciente con 1 click.
 // Reusa la plantilla reportDeliveryEmail (misma que admin/send-report-email).
+// Match customer Amelia → diagnostico_tests por email (luego phone como fallback).
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { sendEmail, reportDeliveryEmail } from "@/lib/emails";
+import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
 
 const sb = createClient(process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!, process.env.BLOG_SUPABASE_SERVICE_KEY!, { auth: { persistSession: false } });
 export const dynamic = "force-dynamic";
@@ -13,19 +15,49 @@ export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   const auth = await requirePsicologa(req);
   if ("status" in auth) return auth;
+  const { provider_id } = auth.agent;
 
   const body = await req.json().catch(() => ({}));
   const customerId = Number(body.customer_id);
   if (!customerId) return NextResponse.json({ error: "missing_customer_id" }, { status: 400 });
 
-  // Busca el test del paciente
-  const { data: row } = await sb
-    .from("diagnostico_tests")
-    .select("id, user_email, user_name, report_url, perfil_nombre, matched_psychologist, scheduled_date, scheduled_time, customer_id, customerId")
-    .or(`customer_id.eq.${customerId},customerId.eq.${customerId}`)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // 1) Verifica ownership Amelia + saca email/phone del paciente
+  const ab = ameliaTable("appointments");
+  const cb = ameliaTable("customer_bookings");
+  const ub = ameliaTable("users");
+  const own = await ameliaQuery<any>(
+    `SELECT cu.email, cu.phone, cu.firstName, cu.lastName
+     FROM ${cb} cb JOIN ${ab} a ON a.id = cb.appointmentId
+     JOIN ${ub} cu ON cu.id = cb.customerId
+     WHERE cb.customerId = ? AND a.providerId = ? LIMIT 1`,
+    [customerId, provider_id],
+  );
+  if (own.length === 0) return NextResponse.json({ error: "out_of_scope", message: "No tienes este paciente asignado." }, { status: 403 });
+  const c = own[0];
+
+  // 2) Localiza el test diagnóstico (email primero, phone fallback)
+  let row: any = null;
+  if (c.email) {
+    const { data } = await sb
+      .from("diagnostico_tests")
+      .select("id, user_email, user_name, report_url, perfil_nombre, matched_psychologist, scheduled_date, scheduled_time")
+      .ilike("user_email", c.email)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    row = data;
+  }
+  if (!row && c.phone) {
+    const variants = [c.phone, String(c.phone).replace(/^\+/, ""), String(c.phone).startsWith("+") ? c.phone : `+${c.phone}`];
+    const { data } = await sb
+      .from("diagnostico_tests")
+      .select("id, user_email, user_name, report_url, perfil_nombre, matched_psychologist, scheduled_date, scheduled_time")
+      .in("user_phone", variants)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    row = data;
+  }
 
   if (!row) return NextResponse.json({ error: "test_not_found", message: "Este paciente no tiene informe diagnóstico." }, { status: 404 });
   if (!row.report_url) return NextResponse.json({ error: "pdf_not_ready", message: "El PDF aún no se ha generado." }, { status: 400 });
