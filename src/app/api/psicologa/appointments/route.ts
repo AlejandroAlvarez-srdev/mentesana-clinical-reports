@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
+import { ameliaBlockLabel } from "@/lib/amelia-block-label";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -43,8 +44,9 @@ export async function GET(req: NextRequest) {
   // Mostramos todos los status (excepto NULL/desconocidos) para que la psicóloga vea su histórico completo.
   const rows = await ameliaQuery<any>(
     `SELECT a.id appointment_id, a.bookingStart, a.bookingEnd, a.googleMeetUrl, a.serviceId, s.name service_name,
+       a.internalNotes,
        cb.id booking_id, cb.customerId, cb.status booking_status,
-       cu.firstName customer_fn, cu.lastName customer_ln
+       cu.firstName customer_fn, cu.lastName customer_ln, cu.email customer_email
      FROM ${ab} a
      LEFT JOIN ${cb} cb ON cb.appointmentId = a.id
      LEFT JOIN ${ub} cu ON cu.id = cb.customerId
@@ -78,8 +80,9 @@ export async function GET(req: NextRequest) {
       service_id: r.serviceId,
       service_name: r.service_name,
       customer_id: r.customerId,
-      // Nombre solo (sin phone/email)
-      customer_name: `${r.customer_fn ?? ""} ${r.customer_ln ?? ""}`.trim() || "(sin nombre)",
+      // Nombre solo (sin phone/email). Para bloqueos internos, el motivo literal.
+      customer_name: ameliaBlockLabel(r).name || "(sin nombre)",
+      is_block: ameliaBlockLabel(r).is_block,
       booking_status: r.booking_status,
       has_clinical_note: notesByAppt.has(r.appointment_id),
       clinical_highlights: notesByAppt.get(r.appointment_id)?.highlights ?? null,
