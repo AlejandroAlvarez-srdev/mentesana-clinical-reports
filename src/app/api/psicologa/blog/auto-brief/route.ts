@@ -3,8 +3,9 @@
 // de la tabla blog_keyword_universe (status='available'), pasa a status='in_progress'
 // con un lock de 30 min. Si la psi no publica en ese tiempo, otro cron la libera.
 //
-// Para que el match sea bueno, mapeamos la "note" / "description" de Amelia
-// a las categorías del universo (ansiedad, depresion, relaciones, etc.).
+// La keyword se elige con VARIEDAD garantizada: se reparte entre TODAS las
+// categorías disponibles, priorizando las que esta psi menos ha trabajado
+// (sin sesgo a su especialidad — el blog necesita cubrir todo el abanico).
 import { NextRequest, NextResponse } from "next/server";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { psyBlogSb } from "@/lib/psy-blog";
@@ -17,34 +18,6 @@ export const maxDuration = 30;
 const ANTHROPIC_KEY = (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x20-\x7E]/g, "").trim();
 const MODEL = "claude-haiku-4-5-20251001";
 
-// Categorías del universo curado. El mapping a las notes/desc de Amelia es
-// por keyword match — si la psi tiene "ansiedad" en su perfil, recibirá una de
-// esas keywords con prioridad.
-const ALL_CATEGORIES = ["ansiedad", "depresion", "relaciones", "autoestima", "duelo", "estres", "crianza", "tcc", "decisiones"] as const;
-type Category = typeof ALL_CATEGORIES[number];
-
-// Marcadores que buscamos en la note/desc para asignar categoría.
-const CATEGORY_HINTS: Record<Category, string[]> = {
-  ansiedad: ["ansiedad", "panico", "fobia", "tac", "tag"],
-  depresion: ["depresion", "depresivo", "estado de animo", "estados anímicos", "anímico"],
-  relaciones: ["pareja", "relacion", "vinculo", "dependencia emocional", "duelo amoroso", "ruptura"],
-  autoestima: ["autoestima", "autoconcepto", "autoimagen", "identidad", "compla"],
-  duelo: ["duelo", "perdida", "muerte", "fallec", "luto"],
-  estres: ["estres", "burnout", "agotamiento", "carga laboral", "fatiga laboral"],
-  crianza: ["crianza", "infantil", "niño", "niña", "adolescente", "famili", "maternal", "paternal"],
-  tcc: ["tcc", "cognitivo", "conductual", "cognitiva", "act", "mindfulness", "tercera generacion"],
-  decisiones: ["decision", "crecimiento", "proyecto", "vocacion", "vocacional", "existencia", "proposito"],
-};
-
-function inferCategories(blob: string): Category[] {
-  const text = blob.toLowerCase();
-  const found: Category[] = [];
-  for (const cat of ALL_CATEGORIES) {
-    if (CATEGORY_HINTS[cat].some((h) => text.includes(h))) found.push(cat);
-  }
-  return found;
-}
-
 export async function POST(req: NextRequest) {
   const auth = await requirePsicologa(req);
   if ("status" in auth) return auth;
@@ -55,9 +28,17 @@ export async function POST(req: NextRequest) {
 
   // Si la psi viene del botón "🎲 Otro tema", libera la keyword anterior antes
   // de pedir una nueva — así no se queda bloqueada 30 min sin necesidad.
+  // Guardamos su categoría para EVITARLA en la nueva selección: el reroll debe
+  // cambiar también de categoría, no solo de keyword dentro de la misma.
   const body = await req.json().catch(() => ({}));
   const releaseKeywordId = Number(body?.release_keyword_id);
+  let avoidCategory = "";
   if (Number.isFinite(releaseKeywordId) && releaseKeywordId > 0) {
+    const prev = await sb.from("blog_keyword_universe")
+      .select("category")
+      .eq("id", releaseKeywordId)
+      .maybeSingle();
+    avoidCategory = (prev.data?.category ?? "").toLowerCase();
     await sb.from("blog_keyword_universe")
       .update({ status: "available", assigned_provider_id: null, assigned_at: null, lock_expires_at: null })
       .eq("id", releaseKeywordId)
@@ -80,9 +61,18 @@ export async function POST(req: NextRequest) {
   } catch { /* best-effort */ }
   const psiName = agent.first_name || agent.name.split(" ")[0];
 
-  // 2) Inferir categorías según el perfil. Si no detectamos ninguna, todas valen.
-  const inferred = inferCategories(`${especialidad} ${bio}`);
-  const preferredCats = inferred.length > 0 ? inferred : [...ALL_CATEGORIES];
+  // 2) Uso por categoría de ESTA psi (lo que ya tiene en curso o publicado),
+  //    para darle primero los temas que MENOS ha trabajado.
+  const mineRes = await sb.from("blog_keyword_universe")
+    .select("category")
+    .eq("assigned_provider_id", agent.provider_id)
+    .in("status", ["in_progress", "published"])
+    .limit(2000);
+  const usageByCat = new Map<string, number>();
+  for (const r of mineRes.data ?? []) {
+    const c = (r.category ?? "").toLowerCase();
+    if (c) usageByCat.set(c, (usageByCat.get(c) ?? 0) + 1);
+  }
 
   // 3) Liberar locks expirados antes de seleccionar (evita zombis)
   await sb.from("blog_keyword_universe")
@@ -90,20 +80,44 @@ export async function POST(req: NextRequest) {
     .eq("status", "in_progress")
     .lt("lock_expires_at", new Date().toISOString());
 
-  // 4) Seleccionar UNA keyword atómicamente.
-  //    Estrategia: SELECT en categorías preferidas → si nada, en todas.
-  //    Usamos update con returning para garantizar atomicidad.
-  async function tryLock(categories: Category[]): Promise<{ id: number; keyword: string; category: string } | null> {
-    // SELECT random de las disponibles en estas categorías
+  // 4) Categorías que tienen keywords disponibles AHORA mismo.
+  const availRes = await sb.from("blog_keyword_universe")
+    .select("category")
+    .eq("status", "available")
+    .limit(3000);
+  const availCats = Array.from(
+    new Set((availRes.data ?? []).map((r) => (r.category ?? "").toLowerCase()).filter(Boolean)),
+  );
+  if (availCats.length === 0) {
+    return NextResponse.json({
+      error: "no_keywords_available",
+      hint: "El universo de keywords está agotado. Pídele al CTO que cargue más en blog_keyword_universe.",
+    }, { status: 409 });
+  }
+
+  // Orden de preferencia: la categoría que esta psi MENOS ha trabajado primero;
+  // empate → aleatorio (así dos psis distintas no reciben siempre lo mismo).
+  const orderedCats = availCats
+    .map((c) => ({ c, n: usageByCat.get(c) ?? 0, r: Math.random() }))
+    .sort((a, b) => a.n - b.n || a.r - b.r)
+    .map((x) => x.c);
+
+  // En un reroll ("🎲 Otro tema") excluimos la categoría anterior para que el
+  // tema nuevo sea de OTRA categoría — salvo que sea la única disponible.
+  const candidateCats = (avoidCategory && orderedCats.some((c) => c !== avoidCategory))
+    ? orderedCats.filter((c) => c !== avoidCategory)
+    : orderedCats;
+
+  // 5) Seleccionar UNA keyword atómicamente de la primera categoría que enganche.
+  //    CAS update (available → in_progress) garantiza que no hay carreras.
+  async function tryLock(category: string): Promise<{ id: number; keyword: string; category: string } | null> {
     const sel = await sb.from("blog_keyword_universe")
       .select("id, keyword, category")
       .eq("status", "available")
-      .in("category", categories)
+      .eq("category", category)
       .limit(20);
     if (!sel.data || sel.data.length === 0) return null;
-    // Random pick
     const pick = sel.data[Math.floor(Math.random() * sel.data.length)];
-    // CAS update — solo si sigue available
     const lock = await sb.from("blog_keyword_universe")
       .update({
         status: "in_progress",
@@ -118,10 +132,10 @@ export async function POST(req: NextRequest) {
     return lock.data ?? null;
   }
 
-  let assigned = await tryLock(preferredCats);
-  if (!assigned && preferredCats.length < ALL_CATEGORIES.length) {
-    // Fallback: todas las categorías
-    assigned = await tryLock([...ALL_CATEGORIES]);
+  let assigned: { id: number; keyword: string; category: string } | null = null;
+  for (const cat of candidateCats) {
+    assigned = await tryLock(cat);
+    if (assigned) break;
   }
   if (!assigned) {
     return NextResponse.json({
@@ -130,7 +144,7 @@ export async function POST(req: NextRequest) {
     }, { status: 409 });
   }
 
-  // 5) Recoger TODOS los títulos ya usados en blog_articles para que Claude los
+  // 6) Recoger TODOS los títulos ya usados en blog_articles para que Claude los
   //    EVITE desde el primer intento (no solo en la verificación post-hoc).
   //    Pasamos los más relevantes: misma categoría primero, después generales recientes.
   const sameCat = await sb.from("blog_articles")
@@ -149,7 +163,7 @@ export async function POST(req: NextRequest) {
   (generalRecent.data ?? []).forEach(r => r.title && forbiddenSet.add(r.title));
   const forbiddenList = Array.from(forbiddenSet).join("\n- ");
 
-  // 6) Pedir a Claude SOLO título + outline + rationale, con la lista de prohibidos.
+  // 7) Pedir a Claude SOLO título + outline + rationale, con la lista de prohibidos.
   const perfilBlock = (especialidad || bio)
     ? `\nPerfil de la psicóloga:
 Nombre: ${psiName}
