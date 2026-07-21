@@ -24,9 +24,9 @@ PERFIL TÍPICO DE PACIENTE (IPC): mujer ${MENTESANA.ipc.ageRange}, ${MENTESANA.i
 
 OFERTA QUE EL PACIENTE PUEDE TENER ACTIVA:
 · Diagnóstico inicial 9,99€ (50 min videollamada + test mental health + informe IA + matching).
-· Sesión individual 45€ (50 min).
-· Bono Compañía: 4 sesiones por 120€ (29,99€/sesión).
-· Bono Felicidad: 8 sesiones por 185€ (23€/sesión) — el más popular.
+· Sesión individual 50€ (50 min).
+· Bono Compañía: 4 sesiones por 149,99€ (37,50€/sesión).
+· Bono Felicidad: 8 sesiones por 229,99€ (28,75€/sesión) — el más popular.
 · Bono Amor: 4 sesiones de pareja 60 min por 179€.
 
 LO QUE INCLUYE SU SUSCRIPCIÓN (puede aparecer en sesión):
