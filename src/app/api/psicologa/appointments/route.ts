@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
 import { ameliaBlockLabel } from "@/lib/amelia-block-label";
+import { enrichWithProgram } from "@/lib/b2b-programas";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -70,23 +71,29 @@ export async function GET(req: NextRequest) {
     notesByAppt = new Map((notes ?? []).map((n: any) => [n.appointment_id, n]));
   }
 
-  return NextResponse.json({
-    appointments: rows.map((r: any) => ({
-      appointment_id: r.appointment_id,
-      booking_id: r.booking_id,
-      booking_start_utc: new Date(r.bookingStart).toISOString(),
-      booking_end_utc: r.bookingEnd ? new Date(r.bookingEnd).toISOString() : null,
-      google_meet_url: r.googleMeetUrl || null,
-      service_id: r.serviceId,
-      service_name: r.service_name,
-      customer_id: r.customerId,
-      // Nombre solo (sin phone/email). Para bloqueos internos, el motivo literal.
-      customer_name: ameliaBlockLabel(r).name || "(sin nombre)",
-      is_block: ameliaBlockLabel(r).is_block,
-      booking_status: r.booking_status,
-      has_clinical_note: notesByAppt.has(r.appointment_id),
-      clinical_highlights: notesByAppt.get(r.appointment_id)?.highlights ?? null,
-      attended: notesByAppt.get(r.appointment_id)?.attended ?? null,
-    })),
-  });
+  const base = rows.map((r: any) => ({
+    appointment_id: r.appointment_id,
+    booking_id: r.booking_id,
+    booking_start_utc: new Date(r.bookingStart).toISOString(),
+    booking_end_utc: r.bookingEnd ? new Date(r.bookingEnd).toISOString() : null,
+    google_meet_url: r.googleMeetUrl || null,
+    service_id: r.serviceId as number | null,
+    service_name: r.service_name,
+    customer_id: r.customerId,
+    // Nombre solo (sin phone/email). Para bloqueos internos, el motivo literal.
+    customer_name: ameliaBlockLabel(r).name || "(sin nombre)",
+    is_block: ameliaBlockLabel(r).is_block,
+    booking_status: r.booking_status,
+    has_clinical_note: notesByAppt.has(r.appointment_id),
+    clinical_highlights: notesByAppt.get(r.appointment_id)?.highlights ?? null,
+    attended: notesByAppt.get(r.appointment_id)?.attended ?? null,
+  }));
+
+  // Enriquece cada cita con `program` si su service_id está en el registry
+  // b2b_programas (Kairos, Cerebro de Líder, Integria, futuros). null = paciente
+  // 9,99€/normal. El JOIN vive en memoria (cache 30s) para no tocar Amelia ni
+  // añadir columnas nuevas a wp_amelia_*.
+  const appointments = await enrichWithProgram(base);
+
+  return NextResponse.json({ appointments });
 }

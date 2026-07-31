@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { ameliaQuery, ameliaExec, ameliaTable } from "@/lib/amelia-db";
 import { voyageEmbed } from "@/lib/voyage-embed";
+import { getProgramaByServiceId } from "@/lib/b2b-programas";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -79,12 +80,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     history = prev ?? [];
   }
 
+  // Lookup contra el registry b2b_programas por service_id: si es una cita B2B
+  // (Kairos, Cerebro de Líder, Integria…) devolvemos el objeto `program` para
+  // que el hero muestre badge + resumen + guía de saludo.
+  const program = await getProgramaByServiceId(Number(r.serviceId));
+
   return NextResponse.json({
     appointment: {
       appointment_id: r.appointment_id,
       booking_id: r.booking_id,
       booking_start_utc: new Date(r.bookingStart).toISOString(),
       booking_end_utc: r.bookingEnd ? new Date(r.bookingEnd).toISOString() : null,
+      service_id: r.serviceId as number | null,
       service_name: r.service_name,
       service_duration: r.service_duration,
       google_meet_url: r.googleMeetUrl || null,
@@ -93,6 +100,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       booking_status: r.booking_status,
       // Cita de diagnóstico 9,99€ → usa la HC Inicial 9.99 estructurada.
       is_diagnostico: DIAG_IDS.includes(Number(r.serviceId)),
+      program,
     },
     note,
     history,

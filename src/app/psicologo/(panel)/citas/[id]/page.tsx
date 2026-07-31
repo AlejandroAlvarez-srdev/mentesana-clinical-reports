@@ -6,10 +6,12 @@ import { RichTextarea, renderMarkdown } from "../../../_components/RichTextarea"
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
 import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder";
 import Link from "next/link";
+import { B2BCitaBadge } from "@/components/B2BCitaBadge";
+import type { B2BProgramaPublic } from "@/lib/b2b-programas";
 
 const PURPLE = "#6A178C";
 
-type Appt = { appointment_id: number; booking_start_utc: string; booking_end_utc: string | null; service_name: string | null; google_meet_url: string | null; customer_id: number; customer_name: string; booking_status: string; is_diagnostico?: boolean };
+type Appt = { appointment_id: number; booking_start_utc: string; booking_end_utc: string | null; service_name: string | null; google_meet_url: string | null; customer_id: number; customer_name: string; booking_status: string; is_diagnostico?: boolean; program?: B2BProgramaPublic | null };
 
 // Secciones de la HC Inicial 9.99 (diagnóstico). Orden y etiquetas según el doc oficial.
 const DIAG_IDENTITY: [string, string][] = [["edad", "Edad"], ["estado_civil", "Estado civil"], ["pais", "País"], ["ciudad", "Ciudad"]];
@@ -134,19 +136,57 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
     <div>
       <Link href="/psicologo/citas" style={{ color: PURPLE, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>← Volver a citas</Link>
 
-      <header style={{ padding: 20, background: `linear-gradient(135deg, ${PURPLE}, #8B2FB5)`, color: "#fff", borderRadius: 16, marginTop: 10, marginBottom: 18 }}>
-        <div style={{ fontSize: 12, opacity: 0.85 }}>{fmt(appt.booking_start_utc)}</div>
-        <h1 style={{ margin: "6px 0 0", fontSize: 24, fontWeight: 800 }}>{appt.customer_name}</h1>
-        <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>{appt.service_name ?? "Sesión"}{appt.booking_status === "canceled" && " · CANCELADA"}</div>
-        {appt.google_meet_url && (
-          <MeetLinkWithCCReminder href={appt.google_meet_url} label="📹 Abrir Google Meet →" variant="pill-large" />
-        )}
-        {!appt.google_meet_url && appt.booking_status !== "canceled" && (
-          <div style={{ display: "inline-block", marginTop: 14, padding: "8px 14px", background: "rgba(245,158,11,0.2)", color: "#fff", borderRadius: 10, fontSize: 12 }}>
-            ⏳ Aún sin enlace Meet (Amelia lo genera tras la reserva)
+      {/* Hero: si es cita B2B (Kairos, Cerebro de Líder, Integria…) el gradiente
+          usa los colores del programa para que la psi vea al instante que NO
+          es un paciente 9,99€ normal. Fallback = morado Mente Sana. */}
+      {(() => {
+        const p = appt.program ?? null;
+        const heroBg = p
+          ? `linear-gradient(135deg, ${p.colors.border}, ${p.colors.text})`
+          : `linear-gradient(135deg, ${PURPLE}, #8B2FB5)`;
+        return (
+          <header style={{ padding: 20, background: heroBg, color: "#fff", borderRadius: 16, marginTop: 10, marginBottom: 18 }}>
+            {p && (
+              <div style={{ marginBottom: 8 }}>
+                <B2BCitaBadge programa={p} size="lg" />
+              </div>
+            )}
+            <div style={{ fontSize: 12, opacity: 0.9 }}>{fmt(appt.booking_start_utc)}</div>
+            <h1 style={{ margin: "6px 0 0", fontSize: 24, fontWeight: 800 }}>{appt.customer_name}</h1>
+            <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4 }}>{appt.service_name ?? "Sesión"}{appt.booking_status === "canceled" && " · CANCELADA"}</div>
+            {appt.google_meet_url && (
+              <MeetLinkWithCCReminder href={appt.google_meet_url} label="📹 Abrir Google Meet →" variant="pill-large" />
+            )}
+            {!appt.google_meet_url && appt.booking_status !== "canceled" && (
+              <div style={{ display: "inline-block", marginTop: 14, padding: "8px 14px", background: "rgba(245,158,11,0.2)", color: "#fff", borderRadius: 10, fontSize: 12 }}>
+                ⏳ Aún sin enlace Meet (Amelia lo genera tras la reserva)
+              </div>
+            )}
+          </header>
+        );
+      })()}
+
+      {/* Para citas B2B: caja con resumen del programa + guía de saludo debajo
+          del hero. Así la psi ve QUÉ es el programa y CÓMO saludar antes de
+          entrar al Meet, sin tener que abrir el modal del badge. */}
+      {appt.program && (
+        <section style={{ marginBottom: 18, background: "#fff", border: `1px solid ${appt.program.colors.border}33`, borderLeft: `4px solid ${appt.program.colors.border}`, borderRadius: 12, padding: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 800, color: appt.program.colors.text, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                {appt.program.emoji} Sobre {appt.program.empresaName}
+              </h3>
+              <div style={{ fontSize: 12.5, color: "#1a1a2e", lineHeight: 1.55 }}>{renderMarkdown(appt.program.resumenMd)}</div>
+            </div>
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 800, color: appt.program.colors.text, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                💬 Cómo saludar
+              </h3>
+              <div style={{ fontSize: 12.5, color: "#1a1a2e", lineHeight: 1.55, padding: 10, background: appt.program.colors.bgSoft, borderRadius: 8 }}>{renderMarkdown(appt.program.saludoMd)}</div>
+            </div>
           </div>
-        )}
-      </header>
+        </section>
+      )}
 
       {/* Nav rapida a secciones */}
       <nav style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", padding: 10, background: "#fff", borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)" }}>

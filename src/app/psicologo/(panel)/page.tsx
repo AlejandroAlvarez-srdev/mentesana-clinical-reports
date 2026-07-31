@@ -9,6 +9,8 @@ import PsiHomeContent from "../_components/PsiHomeContent";
 import MeetLinkWithCCReminder from "../_components/MeetLinkWithCCReminder";
 import CCAlwaysOnBanner from "../_components/CCAlwaysOnBanner";
 import AnnouncementsBanner from "../_components/AnnouncementsBanner";
+import { B2BCitaBadge } from "@/components/B2BCitaBadge";
+import type { B2BProgramaPublic } from "@/lib/b2b-programas";
 
 const PURPLE = "#6A178C";
 const DIAGNOSTICO_IDS = [8, 11];
@@ -23,6 +25,7 @@ type Appt = {
   has_clinical_note: boolean;
   attended: boolean | null;
   booking_status: string;
+  program: B2BProgramaPublic | null;
 };
 
 function fmtHr(iso: string) {
@@ -109,15 +112,23 @@ function Kpi({ label, value, color, sub }: { label: string; value: number; color
 }
 
 function ApptCard({ a, showDay = false }: { a: Appt; showDay?: boolean }) {
+  // Tint por empresa B2B: fondo tenue + barra izquierda con el color del
+  // programa (Kairos, Cerebro de Líder, Integria…) → imposible confundir con
+  // un paciente 9,99€ normal.
+  const bg = a.program?.colors.bgSoft ?? "#fff";
+  const leftBar = a.program ? `4px solid ${a.program.colors.border}` : "1px solid rgba(0,0,0,0.06)";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: "#fff", borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)", flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: bg, borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)", borderLeft: leftBar, flexWrap: "wrap" }}>
       <Link href={`/psicologo/citas/${a.appointment_id}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", flex: 1, minWidth: 200 }}>
         <div style={{ minWidth: 60 }}>
           {showDay && <div style={{ fontSize: 10, color: "#888", textTransform: "capitalize" }}>{fmtDay(a.booking_start_utc)}</div>}
           <div style={{ fontSize: 16, fontWeight: 800, color: PURPLE }}>{fmtHr(a.booking_start_utc)}</div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e" }}>{a.customer_name}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span>{a.customer_name}</span>
+            {a.program && <B2BCitaBadge programa={a.program} size="sm" />}
+          </div>
           <div style={{ fontSize: 11, color: "#666" }}>{a.service_name ?? "Sesión"}</div>
         </div>
       </Link>
