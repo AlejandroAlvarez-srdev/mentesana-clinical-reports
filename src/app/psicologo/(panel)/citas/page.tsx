@@ -76,7 +76,11 @@ export default function CitasPage() {
                   </Link>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     {a.google_meet_url && (
-                      <MeetLinkWithCCReminder href={a.google_meet_url} />
+                      <MeetLinkWithCCReminder
+                        href={a.google_meet_url}
+                        programa={a.program}
+                        patientName={a.customer_name}
+                      />
                     )}
                     {a.booking_status !== "canceled" && (
                       <AttendanceQuick appointmentId={a.appointment_id} initial={a.attended ?? derivAttended(a.booking_status)} compact />

@@ -155,7 +155,13 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
             <h1 style={{ margin: "6px 0 0", fontSize: 24, fontWeight: 800 }}>{appt.customer_name}</h1>
             <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4 }}>{appt.service_name ?? "Sesión"}{appt.booking_status === "canceled" && " · CANCELADA"}</div>
             {appt.google_meet_url && (
-              <MeetLinkWithCCReminder href={appt.google_meet_url} label="📹 Abrir Google Meet →" variant="pill-large" />
+              <MeetLinkWithCCReminder
+                href={appt.google_meet_url}
+                label="📹 Abrir Google Meet →"
+                variant="pill-large"
+                programa={appt.program ?? null}
+                patientName={appt.customer_name}
+              />
             )}
             {!appt.google_meet_url && appt.booking_status !== "canceled" && (
               <div style={{ display: "inline-block", marginTop: 14, padding: "8px 14px", background: "rgba(245,158,11,0.2)", color: "#fff", borderRadius: 10, fontSize: 12 }}>

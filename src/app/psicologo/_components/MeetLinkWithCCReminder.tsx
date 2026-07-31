@@ -6,7 +6,15 @@
 // Por qué: para que el asistente pueda preparar tu resumen tras la
 // sesión, los subtítulos en español tienen que estar activos en Meet.
 // Recordatorio en 1 click que evita el olvido más común.
+//
+// B2B (2026-07-31): si la cita es de una empresa cliente (Kairos, Cerebro de
+// Líder, Integria…) se muestra PRIMERO el <B2BPreMeetModal> obligatorio con
+// las reglas de esa empresa (no vender, no mencionar Mente Sana, cerrar
+// pidiendo agendar con la empresa). Sólo cuando la psi acepta el checkbox
+// pasamos al modal de subtítulos y luego a abrir el Meet.
 import { useState } from "react";
+import type { B2BProgramaPublic } from "@/lib/b2b-programas";
+import { B2BPreMeetModal } from "@/components/B2BPreMeetModal";
 
 const PURPLE = "#6A178C";
 const GREEN = "#16a34a";
@@ -15,19 +23,38 @@ interface Props {
   href: string;
   label?: string;
   variant?: "pill-small" | "pill-large";
+  // Cita B2B (opcional). Si viene, gateamos con B2BPreMeetModal antes del CC.
+  programa?: B2BProgramaPublic | null;
+  patientName?: string;
 }
 
-export default function MeetLinkWithCCReminder({ href, label = "📹 Meet", variant = "pill-small" }: Props) {
-  const [open, setOpen] = useState(false);
+export default function MeetLinkWithCCReminder({
+  href,
+  label = "📹 Meet",
+  variant = "pill-small",
+  programa = null,
+  patientName,
+}: Props) {
+  const [openCC, setOpenCC] = useState(false);
+  const [openB2B, setOpenB2B] = useState(false);
 
   function openModal(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    setOpen(true);
+    // Prioridad B2B → CC → Meet. Sin programa, salta directo al CC como siempre.
+    if (programa) setOpenB2B(true);
+    else setOpenCC(true);
+  }
+
+  function afterB2BAccept() {
+    setOpenB2B(false);
+    // Encadenamos con el modal de subtítulos: sigue siendo obligatorio activar
+    // CC para que el asistente prepare el resumen post-sesión.
+    setOpenCC(true);
   }
 
   function confirm() {
-    setOpen(false);
+    setOpenCC(false);
     window.open(href, "_blank", "noopener,noreferrer");
   }
 
@@ -52,9 +79,21 @@ export default function MeetLinkWithCCReminder({ href, label = "📹 Meet", vari
         {label}
       </button>
 
-      {open && (
+      {/* B2B gate: reglas anti-venta antes del recordatorio CC */}
+      {programa && (
+        <B2BPreMeetModal
+          programa={programa}
+          meetUrl={href}
+          open={openB2B}
+          onClose={() => setOpenB2B(false)}
+          onConfirm={afterB2BAccept}
+          patientName={patientName}
+        />
+      )}
+
+      {openCC && (
         <div
-          onClick={() => setOpen(false)}
+          onClick={() => setOpenCC(false)}
           role="dialog"
           aria-modal="true"
           style={{
@@ -102,7 +141,7 @@ export default function MeetLinkWithCCReminder({ href, label = "📹 Meet", vari
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button
-                onClick={() => setOpen(false)}
+                onClick={() => setOpenCC(false)}
                 style={{
                   padding: "10px 16px", borderRadius: 10,
                   border: "1px solid rgba(0,0,0,0.12)", background: "#fff",
