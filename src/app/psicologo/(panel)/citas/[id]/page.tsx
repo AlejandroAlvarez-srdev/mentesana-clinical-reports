@@ -152,8 +152,19 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             )}
             <div style={{ fontSize: 12, opacity: 0.9 }}>{fmt(appt.booking_start_utc)}</div>
-            <h1 style={{ margin: "6px 0 0", fontSize: 24, fontWeight: 800 }}>{appt.customer_name}</h1>
-            <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4 }}>{appt.service_name ?? "Sesión"}{appt.booking_status === "canceled" && " · CANCELADA"}</div>
+            {/* Nombre del paciente + pill inline con emoji+empresa (mismo look
+                que el row de la agenda del jefe-psi → refuerzo visual: aunque
+                la psi tenga varias tabs abiertas ve al instante que ESTA cita
+                no es 9,99€ sino programa B2B). */}
+            <h1 style={{ margin: "6px 0 0", fontSize: 24, fontWeight: 800, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {appt.customer_name}
+              {p && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 999, background: p.colors.badgeBg, color: p.colors.text, fontSize: 11, fontWeight: 800, letterSpacing: 0.3, textTransform: "uppercase" }}>
+                  {p.emoji ?? "🏢"} {p.empresaName}
+                </span>
+              )}
+            </h1>
+            <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4 }}>{p ? `${p.programaName} · ${appt.service_name ?? "Sesión"}` : (appt.service_name ?? "Sesión")}{appt.booking_status === "canceled" && " · CANCELADA"}</div>
             {appt.google_meet_url && (
               <MeetLinkWithCCReminder
                 href={appt.google_meet_url}
