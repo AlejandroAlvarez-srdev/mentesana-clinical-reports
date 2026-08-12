@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
     google_meet_url: r.googleMeetUrl || null,
     service_id: r.serviceId as number | null,
     service_name: r.service_name,
+    internal_notes: r.internalNotes ?? null,
     customer_id: r.customerId,
     // Nombre solo (sin phone/email). Para bloqueos internos, el motivo literal.
     customer_name: ameliaBlockLabel(r).name || "(sin nombre)",

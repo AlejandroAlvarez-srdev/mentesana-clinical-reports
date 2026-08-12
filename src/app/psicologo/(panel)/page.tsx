@@ -11,6 +11,7 @@ import CCAlwaysOnBanner from "../_components/CCAlwaysOnBanner";
 import AnnouncementsBanner from "../_components/AnnouncementsBanner";
 import { B2BCitaBadge } from "@/components/B2BCitaBadge";
 import type { B2BProgramaPublic } from "@/lib/b2b-programas";
+import { extractProductoFromNotes, type Producto } from "@/lib/productos-catalogo";
 
 const PURPLE = "#6A178C";
 const DIAGNOSTICO_IDS = [8, 11];
@@ -26,6 +27,7 @@ type Appt = {
   attended: boolean | null;
   booking_status: string;
   program: B2BProgramaPublic | null;
+  internal_notes?: string | null;
 };
 
 function fmtHr(iso: string) {
@@ -117,6 +119,14 @@ function ApptCard({ a, showDay = false }: { a: Appt; showDay?: boolean }) {
   // un paciente 9,99€ normal.
   const bg = a.program?.colors.bgSoft ?? "#fff";
   const leftBar = a.program ? `4px solid ${a.program.colors.border}` : "1px solid rgba(0,0,0,0.06)";
+  // Producto de origen (terapia sueño, plan compañía, VSL, diag 9,99, etc).
+  // Sale del marker [PRODUCT:<slug>] inyectado en internalNotes al crear la
+  // reserva (amelia-create-booking.ts / hold-slot.ts). Sirve a la psi para
+  // preparar la sesión con el ángulo comercial correcto ("¿esta paciente viene
+  // de la landing de duelo o de la de ansiedad?"). Retrocompatible: null en
+  // citas antiguas → no renderiza nada.
+  const producto = extractProductoFromNotes(a.internal_notes ?? null);
+  const [productoModalOpen, setProductoModalOpen] = useState(false);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: bg, borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)", borderLeft: leftBar, flexWrap: "wrap" }}>
       <Link href={`/psicologo/citas/${a.appointment_id}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", flex: 1, minWidth: 200 }}>
@@ -128,6 +138,12 @@ function ApptCard({ a, showDay = false }: { a: Appt; showDay?: boolean }) {
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a2e", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span>{a.customer_name}</span>
             {a.program && <B2BCitaBadge programa={a.program} size="sm" />}
+            {producto && (
+              <ProductoBadge
+                producto={producto}
+                onInfo={() => setProductoModalOpen(true)}
+              />
+            )}
           </div>
           <div style={{ fontSize: 11, color: "#666" }}>{a.service_name ?? "Sesión"}</div>
         </div>
@@ -144,6 +160,82 @@ function ApptCard({ a, showDay = false }: { a: Appt; showDay?: boolean }) {
         <Link href={`/psicologo/citas/${a.appointment_id}`} title={a.has_clinical_note ? "Ver/editar nota clínica" : "✍️ Escribir nota clínica"} style={{ fontSize: 11, padding: "5px 10px", background: a.has_clinical_note ? "rgba(16,185,129,0.14)" : "rgba(245,158,11,0.14)", color: a.has_clinical_note ? "#065f46" : "#92400e", borderRadius: 8, fontWeight: 800, textDecoration: "none", whiteSpace: "nowrap", border: a.has_clinical_note ? "1px solid rgba(16,185,129,0.3)" : "1px dashed rgba(245,158,11,0.4)" }}>
           {a.has_clinical_note ? "✓ HC" : "✍️ + HC"}
         </Link>
+      </div>
+      {producto && productoModalOpen && (
+        <ProductoInfoModal producto={producto} onClose={() => setProductoModalOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+// Badge del producto de origen (categoría + emoji + label corto) + botón ℹ️
+// que abre modal con descripción completa. Clave para que la psi prepare la
+// sesión con el ángulo correcto ("esta cita vino de landing X"). Colores del
+// catálogo alineados por categoría (morado terapia / verde acomp / naranja VSL
+// / azul diag / rosa plan).
+function ProductoBadge({ producto, onInfo }: { producto: Producto; onInfo: () => void }) {
+  return (
+    <span
+      title={`${producto.labelCategoria} · ${producto.slug}`}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "1px 4px 1px 6px", borderRadius: 999,
+        background: producto.colors.bg, color: producto.colors.fg,
+        border: `1px solid ${producto.colors.border}`,
+        fontSize: 10, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1.4,
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 11 }}>{producto.emoji}</span>
+      <span>{producto.label}</span>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInfo(); }}
+        title="Ver descripción del producto"
+        aria-label={`Descripción de ${producto.label}`}
+        style={{
+          marginLeft: 2, padding: "0 4px", fontSize: 10, fontWeight: 800,
+          color: producto.colors.fg, background: "rgba(255,255,255,0.65)",
+          border: `1px solid ${producto.colors.border}`, borderRadius: 999,
+          cursor: "pointer", lineHeight: 1.3, fontFamily: "inherit",
+        }}
+      >ℹ️</button>
+    </span>
+  );
+}
+
+// Modal con descripción del producto que originó la cita. Sirve a la psi para
+// preparar la sesión con el ángulo comercial correcto sin abrir la landing.
+function ProductoInfoModal({ producto, onClose }: { producto: Producto; onClose: () => void }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 14, padding: 22, maxWidth: 480, width: "100%", borderTop: `4px solid ${producto.colors.fg}` }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: producto.colors.bg, border: `1px solid ${producto.colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{producto.emoji}</div>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ margin: 0, fontSize: 16, color: producto.colors.fg, fontWeight: 800 }}>{producto.label}</h2>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#666", fontWeight: 700 }}>{producto.labelCategoria}</p>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 800, color: producto.colors.fg }}>{producto.precio.toFixed(2)} €</span>
+        </div>
+        <p style={{ margin: "0 0 10px", fontSize: 13, color: "#1a1a2e", lineHeight: 1.5 }}>{producto.descripcion}</p>
+        {producto.angulo && (
+          <p style={{ margin: "0 0 12px", fontSize: 11, color: "#475569", fontStyle: "italic" }}>Ángulo comercial: {producto.angulo}</p>
+        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, color: "#666", flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "ui-monospace, monospace", background: "#f4f4f4", padding: "2px 6px", borderRadius: 4 }}>{producto.slug}</span>
+          <a href={producto.landing} target="_blank" rel="noreferrer" style={{ color: producto.colors.fg, fontWeight: 700, textDecoration: "underline" }}>
+            {producto.landing}
+          </a>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
+          <button onClick={onClose} style={{ padding: "8px 16px", fontSize: 12, fontWeight: 800, color: "#fff", background: producto.colors.fg, border: "none", borderRadius: 8, cursor: "pointer" }}>Cerrar</button>
+        </div>
       </div>
     </div>
   );
