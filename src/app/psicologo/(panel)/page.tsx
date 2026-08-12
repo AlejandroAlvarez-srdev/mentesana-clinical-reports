@@ -11,7 +11,7 @@ import CCAlwaysOnBanner from "../_components/CCAlwaysOnBanner";
 import AnnouncementsBanner from "../_components/AnnouncementsBanner";
 import { B2BCitaBadge } from "@/components/B2BCitaBadge";
 import type { B2BProgramaPublic } from "@/lib/b2b-programas";
-import { extractProductoFromNotes, type Producto } from "@/lib/productos-catalogo";
+import { inferProducto, type Producto } from "@/lib/productos-catalogo";
 
 const PURPLE = "#6A178C";
 const DIAGNOSTICO_IDS = [8, 11];
@@ -125,7 +125,7 @@ function ApptCard({ a, showDay = false }: { a: Appt; showDay?: boolean }) {
   // preparar la sesión con el ángulo comercial correcto ("¿esta paciente viene
   // de la landing de duelo o de la de ansiedad?"). Retrocompatible: null en
   // citas antiguas → no renderiza nada.
-  const producto = extractProductoFromNotes(a.internal_notes ?? null);
+  const producto = inferProducto({ internal_notes: a.internal_notes, service_id: (a as any).service_id, service_name: (a as any).service_name, price: (a as any).price ?? (a as any).service_price });
   const [productoModalOpen, setProductoModalOpen] = useState(false);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: bg, borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)", borderLeft: leftBar, flexWrap: "wrap" }}>
