@@ -6,13 +6,14 @@ import PatientTasks from "../../../_components/PatientTasks";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
 
 const PURPLE = "#6A178C";
+const GOLD = "#D4AF37";
 type Session = { appointment_id: number; booking_start_utc: string; service_name: string | null; google_meet_url: string | null; booking_status: string };
 type Package = { id: number; name: string; start: string | null; end: string | null; total_bookings: number; used_bookings: number; remaining: number };
-type Note = { id: string; appointment_id: number; session_date: string; highlights: string | null; how_went: string | null; patient_state: string | null; intervention: string | null; next_steps: string | null; homework: string | null; red_flags: string | null; attended: boolean | null };
+type Note = { id: string; appointment_id: number; session_date: string; highlights: string | null; how_went: string | null; patient_state: string | null; intervention: string | null; next_steps: string | null; homework: string | null; red_flags: string | null; attended: boolean | null; provider_id?: number | null };
 
 export default function PacienteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [data, setData] = useState<{ patient: { customer_id: number; name: string; first_name: string }; sessions: Session[]; packages: Package[]; notes: Note[] } | null>(null);
+  const [data, setData] = useState<{ patient: { customer_id: number; name: string; first_name: string }; sessions: Session[]; packages: Package[]; notes: Note[]; previous_notes_other_psi?: Note[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +67,115 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
       <div style={{ marginBottom: 18 }}>
         <PatientTasks customerId={data.patient.customer_id} patientFirstName={data.patient.first_name || data.patient.name.split(" ")[0]} />
       </div>
+
+      {(data.previous_notes_other_psi?.length ?? 0) > 0 && (
+        <section style={{ marginBottom: 18 }}>
+          {/* Banner "hermoso" — gradient morado→oro sutil, borde izquierdo oro,
+              acento eyebrow, tipografía serif en H2. Comunica continuidad
+              clínica sin agobiar. */}
+          <div
+            style={{
+              position: "relative",
+              padding: "18px 20px",
+              background: `linear-gradient(135deg, ${PURPLE}0D 0%, ${GOLD}14 100%)`,
+              border: `1px solid ${GOLD}55`,
+              borderLeft: `4px solid ${GOLD}`,
+              borderRadius: 14,
+              marginBottom: 12,
+              boxShadow: `0 6px 20px rgba(106,23,140,0.06)`,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: -20,
+                right: -20,
+                width: 100,
+                height: 100,
+                background: `radial-gradient(circle, ${GOLD}22, transparent 70%)`,
+                borderRadius: "50%",
+              }}
+            />
+            <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div
+                style={{
+                  flexShrink: 0,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: `linear-gradient(135deg, ${PURPLE}, #8B2FB5)`,
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 20,
+                  boxShadow: `0 4px 12px rgba(106,23,140,0.25)`,
+                }}
+              >
+                🩺
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, letterSpacing: 1.2, color: GOLD, fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>
+                  Contexto clínico previo
+                </div>
+                <h2 style={{ margin: 0, fontSize: 17, color: "#1a1a2e", fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 500, lineHeight: 1.25 }}>
+                  Este paciente estuvo antes con <em style={{ color: PURPLE }}>otra psicóloga</em>
+                </h2>
+                <p style={{ margin: "5px 0 0", fontSize: 12.5, color: "#475569", lineHeight: 1.5 }}>
+                  {data.previous_notes_other_psi!.length} {data.previous_notes_other_psi!.length === 1 ? "sesión documentada" : "sesiones documentadas"} · read-only para continuidad clínica
+                </p>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {data.previous_notes_other_psi!.map((n) => {
+              const transferida = /transferida|heredada/i.test((n.next_steps ?? "") + (n.highlights ?? ""));
+              return (
+                <details
+                  key={n.id}
+                  style={{
+                    background: "#fff",
+                    borderRadius: 10,
+                    border: `1px solid ${GOLD}33`,
+                    borderLeft: `3px solid ${GOLD}`,
+                  }}
+                >
+                  <summary style={{ padding: "10px 14px", cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: "#1a1a2e", listStyle: "none", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ color: GOLD }}>▸</span>
+                    <span>
+                      {new Date(n.session_date).toLocaleDateString("es-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                    {n.provider_id && (
+                      <span style={{ fontSize: 10, padding: "1px 6px", background: "rgba(106,23,140,0.08)", color: PURPLE, borderRadius: 3, letterSpacing: 0.3, fontWeight: 700 }}>
+                        Ps. #{n.provider_id}
+                      </span>
+                    )}
+                    {transferida && (
+                      <span style={{ fontSize: 10, padding: "1px 6px", background: `${GOLD}22`, color: "#7a5a00", borderRadius: 3, fontWeight: 700, letterSpacing: 0.3 }}>
+                        ✋ TRANSFERIDA
+                      </span>
+                    )}
+                    {n.attended === false && <span style={{ fontSize: 10, padding: "1px 5px", background: "#fee", color: "#991b1b", borderRadius: 3 }}>NO ASISTIÓ</span>}
+                    {n.red_flags && <span style={{ fontSize: 10, padding: "1px 5px", background: "rgba(220,38,38,0.14)", color: "#991b1b", borderRadius: 3 }}>🚨 red flag</span>}
+                    {n.highlights && <span style={{ fontWeight: 500, color: "#666", marginLeft: 4, fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>· {n.highlights}</span>}
+                    <span style={{ marginLeft: "auto", fontSize: 10, color: "#94a3b8", fontStyle: "italic", fontWeight: 500 }}>read-only</span>
+                  </summary>
+                  <div style={{ padding: "0 14px 14px", fontSize: 12.5, color: "#475569", lineHeight: 1.6 }}>
+                    {n.how_went && <Section title="💬 Cómo fue">{n.how_went}</Section>}
+                    {n.patient_state && <Section title="🎭 Estado paciente">{n.patient_state}</Section>}
+                    {n.intervention && <Section title="🛠️ Intervención">{n.intervention}</Section>}
+                    {n.next_steps && <Section title="🎯 Plan próxima">{n.next_steps}</Section>}
+                    {n.homework && <Section title="📚 Tareas casa">{n.homework}</Section>}
+                    {n.red_flags && <Section title="🚨 Red flags" danger>{n.red_flags}</Section>}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section style={{ marginBottom: 18 }}>
         <h2 style={{ fontSize: 16, color: "#1a1a2e", margin: "0 0 8px" }}>📝 Historial clínico</h2>
