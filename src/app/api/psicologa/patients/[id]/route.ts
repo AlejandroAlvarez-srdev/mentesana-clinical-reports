@@ -69,11 +69,22 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     [provider_id, provider_id, customerId],
   );
 
-  // Notas clínicas
+  // HC propias de la psi actual.
   const { data: notes } = await sb
     .from("psychologist_clinical_notes")
     .select("*")
     .eq("provider_id", provider_id)
+    .eq("customer_id", customerId)
+    .order("session_date", { ascending: false });
+
+  // HC previas de OTRAS psicólogas para el mismo paciente (read-only, banner
+  // en la UI). Evita el bug de "no se transfirió la HC" cuando el paciente
+  // rota de psi — cualquier psi que abra la ficha ve la continuidad clínica.
+  // Incidente 14-ago-2026 ([paciente] · Paola → Alexandra) documentado en memoria.
+  const { data: previousNotesOtherPsi } = await sb
+    .from("psychologist_clinical_notes")
+    .select("*")
+    .neq("provider_id", provider_id)
     .eq("customer_id", customerId)
     .order("session_date", { ascending: false });
 
@@ -101,5 +112,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       remaining: Math.max(0, Number(p.total_bookings ?? 0) - Number(p.used_bookings ?? 0)),
     })),
     notes: notes ?? [],
+    previous_notes_other_psi: previousNotesOtherPsi ?? [],
   });
 }
