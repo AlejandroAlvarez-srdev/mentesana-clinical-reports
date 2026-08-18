@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import PatientTasks from "../../../_components/PatientTasks";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
+import BienvenidaMotivos from "../../../_components/BienvenidaMotivos";
 
 const PURPLE = "#6A178C";
 const GOLD = "#D4AF37";
@@ -45,6 +46,11 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
       {/* PDF diagnóstico */}
       <div style={{ marginBottom: 18 }}>
         <DiagnosticoPDF customerId={data.patient.customer_id} />
+      </div>
+
+      {/* Motivos de la cita de bienvenida (solo aparece si el paciente hizo ese test) */}
+      <div style={{ marginBottom: 18 }}>
+        <BienvenidaMotivos customerId={data.patient.customer_id} />
       </div>
 
       {data.packages.length > 0 && (
