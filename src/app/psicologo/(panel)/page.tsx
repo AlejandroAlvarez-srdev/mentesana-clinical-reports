@@ -221,7 +221,7 @@ function ProductoInfoModal({ producto, onClose }: { producto: Producto; onClose:
             <h2 style={{ margin: 0, fontSize: 16, color: producto.colors.fg, fontWeight: 800 }}>{producto.label}</h2>
             <p style={{ margin: "2px 0 0", fontSize: 11, color: "#666", fontWeight: 700 }}>{producto.labelCategoria}</p>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 800, color: producto.colors.fg }}>{producto.precio.toFixed(2)} €</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: producto.colors.fg }}>{producto.precio > 0 ? `${producto.precio.toFixed(2)} €` : "🎯 Cerrar bono"}</span>
         </div>
         <p style={{ margin: "0 0 10px", fontSize: 13, color: "#1a1a2e", lineHeight: 1.5 }}>{producto.descripcion}</p>
         {producto.angulo && (
