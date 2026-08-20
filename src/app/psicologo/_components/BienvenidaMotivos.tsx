@@ -93,10 +93,10 @@ export default function BienvenidaMotivos({ customerId, isFirstSession }: { cust
       )}
 
       {r.motivo_asistir && (
-        <Block label="📝 Por qué pide ayuda ahora (sus palabras)">{r.motivo_asistir}</Block>
+        <Block label="🎯 Qué quiere lograr en la sesión (sus palabras)">{r.motivo_asistir}</Block>
       )}
       {r.expectativa && (
-        <Block label="🎯 Qué espera de la terapia">{r.expectativa}</Block>
+        <Block label="🧘 Dónde se conectará · privacidad y silencio">{r.expectativa}</Block>
       )}
       {r.abiertas.length > 0 && (
         <details style={{ marginTop: 8 }}>

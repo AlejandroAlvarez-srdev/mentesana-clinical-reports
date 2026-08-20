@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
-import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
+import { ameliaQuery, ameliaTable, bienvenidaConfirmedSqlFilter } from "@/lib/amelia-db";
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!,
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
     )`;
     mainParams.push(provider_id);
   }
-  const baseWhere = `WHERE a.providerId = ? AND cb.status IN ('approved','pending')${whereSearch}${whereFilter}`;
+  const baseWhere = `WHERE a.providerId = ? AND cb.status IN ('approved','pending')${bienvenidaConfirmedSqlFilter("a")}${whereSearch}${whereFilter}`;
 
   // Construcción de queries (no ejecutadas todavía)
   const mainQuery = ameliaQuery<PatientRow>(
@@ -142,7 +142,7 @@ export async function GET(req: NextRequest) {
     `SELECT COUNT(DISTINCT cb.customerId) AS c
        FROM ${cb} cb
        JOIN ${ab} a ON a.id = cb.appointmentId
-      WHERE a.providerId = ? AND cb.status IN ('approved','pending')`,
+      WHERE a.providerId = ? AND cb.status IN ('approved','pending')${bienvenidaConfirmedSqlFilter("a")}`,
     [provider_id],
   );
   const countWithPkgQuery = ameliaQuery<{ c: number }>(

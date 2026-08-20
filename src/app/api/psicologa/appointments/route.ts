@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
-import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
+import { ameliaQuery, ameliaTable, bienvenidaConfirmedSqlFilter } from "@/lib/amelia-db";
 import { ameliaBlockLabel } from "@/lib/amelia-block-label";
 import { enrichWithProgram } from "@/lib/b2b-programas";
 
@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
      LEFT JOIN ${sv} s ON s.id = a.serviceId
      WHERE a.providerId = ?
        AND (cb.status IS NULL OR cb.status IN ('approved','pending','canceled','no-show','rejected'))
+       ${bienvenidaConfirmedSqlFilter("a")}
        ${whereTime}
      ORDER BY a.bookingStart ${range === "past" ? "DESC" : "ASC"}
      LIMIT 200`,
