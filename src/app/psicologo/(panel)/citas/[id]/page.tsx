@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState } from "react";
 import PatientTasks from "../../../_components/PatientTasks";
 import { RichTextarea, renderMarkdown } from "../../../_components/RichTextarea";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
+import BienvenidaMotivos from "../../../_components/BienvenidaMotivos";
 import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder";
 import Link from "next/link";
 import { B2BCitaBadge } from "@/components/B2BCitaBadge";
@@ -218,6 +219,13 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
           <DiagnosticoPDF customerId={appt.customer_id} isFirstSession={history.length === 0} />
         </div>
       )}
+
+      {/* Motivos + PDF de la Cita de Bienvenida — solo aparece si el paciente
+          hizo ese test (BienvenidaMotivos devuelve null si no). Auto-genera el
+          PDF al abrir si aún no existe. */}
+      <div style={{ marginBottom: 18 }}>
+        <BienvenidaMotivos customerId={appt.customer_id} isFirstSession={history.length === 0} />
+      </div>
 
       {/* Historial — timeline glanceable para no repetir temas (Juliana) */}
       {history.length > 0 && (

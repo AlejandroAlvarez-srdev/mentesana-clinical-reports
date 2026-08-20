@@ -24,10 +24,30 @@ export default function BienvenidaMotivos({ customerId, isFirstSession }: { cust
   const [genBusy, setGenBusy] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/psicologa/bienvenida-report?customer_id=${customerId}`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: Resp | null) => { setData(d); if (d?.report?.report_url) setReportUrl(d.report.report_url); })
-      .finally(() => setLoading(false));
+      .then((d: Resp | null) => {
+        if (cancelled) return;
+        setData(d);
+        if (d?.report?.report_url) {
+          setReportUrl(d.report.report_url);
+        } else if (d?.found && d.report?.appointment_id) {
+          // Self-heal: si la reserva existe pero el PDF no se generó (reservas
+          // previas al auto-gen o si falló en /reserve), lo generamos al vuelo
+          // en cuanto la psi abre la ficha — sin que tenga que clickar nada.
+          fetch("/api/generate-bienvenida-pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ appointment_id: d.report.appointment_id }),
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((g: { url?: string } | null) => { if (!cancelled && g?.url) setReportUrl(g.url); })
+            .catch(() => {});
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [customerId]);
 
   if (loading) return <div style={{ padding: 12, color: "#888", fontSize: 12 }}>Buscando cita de bienvenida…</div>;
