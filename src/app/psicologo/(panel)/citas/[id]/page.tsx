@@ -5,6 +5,7 @@ import PatientTasks from "../../../_components/PatientTasks";
 import { RichTextarea, renderMarkdown } from "../../../_components/RichTextarea";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
 import BienvenidaMotivos from "../../../_components/BienvenidaMotivos";
+import EncuadreInforme from "../../../_components/EncuadreInforme";
 import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder";
 import Link from "next/link";
 import { B2BCitaBadge } from "@/components/B2BCitaBadge";
@@ -219,6 +220,10 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
           <DiagnosticoPDF customerId={appt.customer_id} isFirstSession={history.length === 0} />
         </div>
       )}
+
+      {/* Informe del test de 30 (tercer embudo). Devuelve null si esta paciente
+          no viene de ahi. Va lo primero: es lo que se lee antes del Meet. */}
+      <EncuadreInforme customerId={appt.customer_id} />
 
       {/* Motivos + PDF de la Cita de Bienvenida — solo aparece si el paciente
           hizo ese test (BienvenidaMotivos devuelve null si no). Auto-genera el
