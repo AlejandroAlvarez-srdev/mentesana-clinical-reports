@@ -15,8 +15,11 @@
  * Orden pensado para leerlo en dos minutos antes de entrar al Meet:
  *   1. La fase (determina toda la estrategia)
  *   2. Sus palabras, tal cual las escribió
- *   3. Qué ha probado que va en contra
- *   4. Lo que está viendo y lo que le está costando a ella
+ *   3. Su contexto: si convive o llama de lejos, si la otra persona sabe que
+ *      hay preocupación, cuánta gente más está encima. Es lo que permite
+ *      aterrizar la estrategia en vez de dar el guion genérico de la fase.
+ *   4. Qué ha probado que va en contra
+ *   5. Lo que está viendo y lo que le está costando a ella
  */
 
 import { useEffect, useState } from "react";
@@ -115,7 +118,27 @@ export default function AcompanamientoInforme({ customerId }: { customerId: numb
         </div>
       )}
 
-      {/* 3 · Lo que ya ha probado y juega en contra */}
+      {/* 3 · Su contexto, que es lo que cambia el plan */}
+      {inf.ajustes.length > 0 && (
+        <div className="mb-5">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-black/45">
+            Su situación cambia el plan
+          </p>
+          <ul className="flex flex-col gap-2">
+            {inf.ajustes.map((a) => (
+              <li key={a.titulo} className="text-sm leading-relaxed text-black/70">
+                <span className="font-semibold" style={{ color: PURPLE }}>
+                  {a.titulo}
+                </span>
+                {" — "}
+                {a.texto}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 4 · Lo que ya ha probado y juega en contra */}
       {inf.errores.length > 0 && (
         <div className="mb-5">
           <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-black/45">
@@ -135,7 +158,7 @@ export default function AcompanamientoInforme({ customerId }: { customerId: numb
         </div>
       )}
 
-      {/* 4 · Las dos medidas */}
+      {/* 5 · Las dos medidas */}
       <div className="flex flex-col gap-3">
         {inf.barras.map((b) => (
           <div key={b.clave}>
