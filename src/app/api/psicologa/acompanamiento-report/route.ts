@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 import { ameliaQuery, ameliaTable } from "@/lib/amelia-db";
-import { PREGUNTAS_ACOMP, conPersona, personaDe } from "@/data/acompanamiento/test";
+import { PREGUNTAS_ACOMP, conPersona, generoDe, personaDe } from "@/data/acompanamiento/test";
 import type { Informe } from "@/lib/acompanamiento/scoring";
 
 const sb = createClient(
@@ -75,11 +75,12 @@ export async function GET(req: NextRequest) {
 
   const variante = (row.variante as string) ?? "acompanamiento-familiar";
   const respuestas = (row.respuestas ?? {}) as Record<string, unknown>;
+  const gp = generoDe(respuestas["x_genero_p"]);
 
   // Las abiertas, con su enunciado, para que se lean sin descifrar ids.
   const abiertas = PREGUNTAS_ACOMP.filter((p) => p.tipo === "abierta")
     .map((p) => ({
-      pregunta: conPersona(p.texto, variante),
+      pregunta: conPersona(p.texto, variante, gp),
       respuesta: typeof respuestas[p.id] === "string" ? (respuestas[p.id] as string).trim() : "",
     }))
     .filter((x) => x.respuesta.length > 0);
@@ -88,7 +89,7 @@ export async function GET(req: NextRequest) {
     found: true,
     customer_name: customerName,
     variante,
-    persona: personaDe(variante),
+    persona: personaDe(variante, gp),
     created_at: row.created_at,
     informe: row.informe as Informe,
     abiertas,
