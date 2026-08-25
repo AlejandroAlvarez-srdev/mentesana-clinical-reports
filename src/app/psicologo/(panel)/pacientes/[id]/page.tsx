@@ -6,6 +6,7 @@ import PatientTasks from "../../../_components/PatientTasks";
 import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
 import BienvenidaMotivos from "../../../_components/BienvenidaMotivos";
 import EncuadreInforme from "../../../_components/EncuadreInforme";
+import AcompanamientoInforme from "../../../_components/AcompanamientoInforme";
 
 const PURPLE = "#6A178C";
 const GOLD = "#D4AF37";
@@ -51,6 +52,7 @@ export default function PacienteDetailPage({ params }: { params: Promise<{ id: s
 
       {/* Informe del test de 30 (solo si la paciente viene del tercer embudo) */}
       <EncuadreInforme customerId={data.patient.customer_id} />
+      <AcompanamientoInforme customerId={data.patient.customer_id} />
 
       {/* Motivos de la cita de bienvenida (solo aparece si el paciente hizo ese test) */}
       <div style={{ marginBottom: 18 }}>
