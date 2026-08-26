@@ -7,6 +7,7 @@ import DiagnosticoPDF from "../../../_components/DiagnosticoPDF";
 import BienvenidaMotivos from "../../../_components/BienvenidaMotivos";
 import EncuadreInforme from "../../../_components/EncuadreInforme";
 import AcompanamientoInforme from "../../../_components/AcompanamientoInforme";
+import EnviarLinkPago from "./_components/EnviarLinkPago";
 import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder";
 import Link from "next/link";
 import { B2BCitaBadge } from "@/components/B2BCitaBadge";
@@ -233,6 +234,10 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
       <div style={{ marginBottom: 18 }}>
         <BienvenidaMotivos customerId={appt.customer_id} isFirstSession={history.length === 0} />
       </div>
+
+      {/* Enviar link de pago al paciente (9,99€ / Bonos) — conversión tras la
+          Llamada Inmediata. Va junto a los motivos, en el detalle de la cita. */}
+      <EnviarLinkPago customerId={appt.customer_id} patientFirstName={appt.customer_name?.split(" ")[0]} />
 
       {/* Historial — timeline glanceable para no repetir temas (Juliana) */}
       {history.length > 0 && (
