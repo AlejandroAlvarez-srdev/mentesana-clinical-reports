@@ -240,7 +240,7 @@ export function TaskThread({ taskId, onChange, uploadFile = uploadTaskFile }: { 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "8px 0" }}>
           <span style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 700, alignSelf: "center" }}>📎 Adjuntos tarea:</span>
           {rootAttachments.map(a => (
-            <a key={a.id} href={a.url} target="_blank" rel="noreferrer" style={{ padding: "3px 8px", background: a.uploaded_by === "patient" ? "rgba(16,163,74,0.1)" : "rgba(106,23,140,0.08)", color: a.uploaded_by === "patient" ? "#065f46" : PURPLE, borderRadius: 4, fontSize: 10.5, fontWeight: 600, textDecoration: "none" }}>
+            <a key={a.id} href={a.url.replace(/\s/g, "")} target="_blank" rel="noreferrer" style={{ padding: "3px 8px", background: a.uploaded_by === "patient" ? "rgba(16,163,74,0.1)" : "rgba(106,23,140,0.08)", color: a.uploaded_by === "patient" ? "#065f46" : PURPLE, borderRadius: 4, fontSize: 10.5, fontWeight: 600, textDecoration: "none" }}>
               {a.uploaded_by === "patient" ? "🟢" : "📄"} {a.filename}
             </a>
           ))}
@@ -259,7 +259,7 @@ export function TaskThread({ taskId, onChange, uploadFile = uploadTaskFile }: { 
                 {m.body && <div style={{ color: "#1a1a2e", whiteSpace: "pre-line", lineHeight: 1.4 }}>{m.body}</div>}
                 {msgAtts.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                    {msgAtts.map(a => <a key={a.id} href={a.url} target="_blank" rel="noreferrer" style={{ padding: "2px 6px", background: "#fff", borderRadius: 3, fontSize: 10, color: PURPLE, fontWeight: 600, textDecoration: "none" }}>📎 {a.filename}</a>)}
+                    {msgAtts.map(a => <a key={a.id} href={a.url.replace(/\s/g, "")} target="_blank" rel="noreferrer" style={{ padding: "2px 6px", background: "#fff", borderRadius: 3, fontSize: 10, color: PURPLE, fontWeight: 600, textDecoration: "none" }}>📎 {a.filename}</a>)}
                   </div>
                 )}
               </div>
