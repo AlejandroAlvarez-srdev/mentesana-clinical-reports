@@ -235,9 +235,11 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
         <BienvenidaMotivos customerId={appt.customer_id} isFirstSession={history.length === 0} />
       </div>
 
-      {/* Enviar link de pago al paciente (9,99€ / Bonos) — conversión tras la
-          Llamada Inmediata. Va junto a los motivos, en el detalle de la cita. */}
-      <EnviarLinkPago customerId={appt.customer_id} patientFirstName={appt.customer_name?.split(" ")[0]} />
+      {/* Enviar link de pago al paciente (9,99€ / Bonos) — SOLO en las citas de
+          Llamada Inmediata (embudo serviceId 300), no en el resto. */}
+      {appt.service_name?.toLowerCase().includes("llamada inmediata") && (
+        <EnviarLinkPago customerId={appt.customer_id} patientFirstName={appt.customer_name?.split(" ")[0]} />
+      )}
 
       {/* Historial — timeline glanceable para no repetir temas (Juliana) */}
       {history.length > 0 && (
