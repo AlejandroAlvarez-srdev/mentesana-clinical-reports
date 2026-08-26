@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const body = await req.json().catch(() => ({}));
   const items: { url: string; storage_path?: string; filename: string; mime_type?: string; size_bytes?: number }[] = Array.isArray(body.attachments) ? body.attachments : [body];
   const rows = items.filter(a => a?.url && a?.filename).map(a => ({
-    task_id: taskId, message_id: null, url: a.url, storage_path: a.storage_path ?? null,
+    task_id: taskId, message_id: null, url: String(a.url ?? "").replace(/\s/g, ""), storage_path: a.storage_path ?? null,
     filename: a.filename, mime_type: a.mime_type ?? null, size_bytes: a.size_bytes ?? null,
     uploaded_by: "psicologa",
   }));

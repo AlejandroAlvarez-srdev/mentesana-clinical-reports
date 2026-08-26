@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   // Inserta adjuntos vinculados al mensaje (si vienen)
   if (attachments.length > 0) {
     const rows = attachments.map(a => ({
-      task_id: taskId, message_id: msg.id, url: a.url, storage_path: a.storage_path ?? null,
+      task_id: taskId, message_id: msg.id, url: String(a.url ?? "").replace(/\s/g, ""), storage_path: a.storage_path ?? null,
       filename: a.filename, mime_type: a.mime_type ?? null, size_bytes: a.size_bytes ?? null,
       uploaded_by: "psicologa",
     }));

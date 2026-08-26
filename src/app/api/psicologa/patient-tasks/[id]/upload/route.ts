@@ -4,9 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePsicologa } from "@/lib/psicologa-auth";
 
-const sb = createClient(process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!, process.env.BLOG_SUPABASE_SERVICE_KEY!, { auth: { persistSession: false } });
+// ⚠️ NEXT_PUBLIC_BLOG_SUPABASE_URL trae un salto de línea (\n) en el env; si no
+// se limpia, se incrusta en la publicUrl del anexo y la URL queda rota (no
+// cargan los adjuntos). Quitamos TODO whitespace.
+const BLOG_URL = (process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL ?? "").replace(/\s/g, "");
+const sb = createClient(BLOG_URL, process.env.BLOG_SUPABASE_SERVICE_KEY!, { auth: { persistSession: false } });
 const BUCKET = "mentesana-patient-tasks";
-const PUBLIC_BASE = `${process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL?.replace(/\/$/, "")}/storage/v1/object/public/${BUCKET}`;
+const PUBLIC_BASE = `${BLOG_URL.replace(/\/$/, "")}/storage/v1/object/public/${BUCKET}`;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
