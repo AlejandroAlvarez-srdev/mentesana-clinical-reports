@@ -8,6 +8,7 @@ import { getPsicologa } from "@/lib/psicologa-auth";
 import { hasPairedExtension } from "@/lib/psicologa-extension";
 import LogoutButton from "../_components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
+import LlamadaInmediataAlert from "@/components/LlamadaInmediataAlert";
 
 // Detección server-side de móvil. La extensión solo existe en Chrome de
 // escritorio, así que en móvil ni la pedimos ni la chequeamos: la psi
@@ -114,6 +115,9 @@ export default async function PsicologaLayout({ children }: { children: React.Re
           </div>
         </div>
       </header>
+      {/* Aviso URGENTE de Llamada Inmediata en curso (serviceId 300): banner rojo
+          en tiempo real (polling) con el enlace de Meet, en todo el panel. */}
+      <LlamadaInmediataAlert api="/api/psicologa/llamadas-inmediatas" />
       {/* Barrita sticky de rendimiento — liquid glass: translúcida con blur,
           tinte del semáforo, Poppins, y línea de progreso (nota/5) abajo. */}
       <div
