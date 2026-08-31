@@ -6,9 +6,28 @@ import AttendanceQuick from "../../_components/AttendanceQuick";
 import MeetLinkWithCCReminder from "../../_components/MeetLinkWithCCReminder";
 import { B2BCitaBadge } from "@/components/B2BCitaBadge";
 import type { B2BProgramaPublic } from "@/lib/b2b-programas";
+import { inferProducto } from "@/lib/productos-catalogo";
 
 const PURPLE = "#6A178C";
-type Appt = { appointment_id: number; booking_start_utc: string; customer_name: string; service_name: string | null; google_meet_url: string | null; has_clinical_note: boolean; attended: boolean | null; booking_status: string; clinical_highlights: string | null; program: B2BProgramaPublic | null };
+type Appt = { appointment_id: number; booking_start_utc: string; customer_name: string; service_id: number | null; service_name: string | null; internal_notes: string | null; google_meet_url: string | null; has_clinical_note: boolean; attended: boolean | null; booking_status: string; clinical_highlights: string | null; program: B2BProgramaPublic | null };
+
+type TipoKey = "all" | "gratuita" | "diagnostico" | "bono" | "llamada" | "terapia" | "acompanamiento";
+const TIPOS: { key: TipoKey; label: string; c: string }[] = [
+  { key: "all", label: "Todas", c: PURPLE },
+  { key: "gratuita", label: "🌱 Bienvenida", c: "#16a34a" },
+  { key: "diagnostico", label: "🧠 Diagnóstico", c: "#7c3aed" },
+  { key: "bono", label: "🔁 Bono", c: "#0891b2" },
+  { key: "llamada", label: "📞 Llamada", c: "#b45309" },
+  { key: "terapia", label: "💜 Terapia", c: "#be185d" },
+  { key: "acompanamiento", label: "👨‍👩‍👧 Acompañam.", c: "#0f766e" },
+];
+function matchesTipo(a: Appt, tipo: TipoKey): boolean {
+  if (tipo === "all") return true;
+  if (tipo === "llamada") return a.service_id === 300;
+  const cat = inferProducto({ internal_notes: a.internal_notes, service_id: a.service_id ?? undefined, service_name: a.service_name })?.categoria;
+  if (tipo === "bono") return cat === "recurrente" || cat === "plan";
+  return cat === tipo;
+}
 
 // Asistencia derivada del estado de Amelia (pending=ASISTIÓ, no-show/rejected=NO,
 // approved=agendada/pendiente) cuando la psi aún no la marcó en su nota.
@@ -20,6 +39,7 @@ function derivAttended(status?: string): boolean | null {
 
 export default function CitasPage() {
   const [range, setRange] = useState<"upcoming" | "today" | "week" | "past">("upcoming");
+  const [tipo, setTipo] = useState<TipoKey>("all");
   const [data, setData] = useState<Appt[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,9 +51,11 @@ export default function CitasPage() {
       .finally(() => setLoading(false));
   }, [range]);
 
+  const visible = data.filter(a => matchesTipo(a, tipo));
+
   // Group by day
   const grouped = new Map<string, Appt[]>();
-  for (const a of data) {
+  for (const a of visible) {
     const day = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(a.booking_start_utc));
     if (!grouped.has(day)) grouped.set(day, []);
     grouped.get(day)!.push(a);
@@ -50,8 +72,15 @@ export default function CitasPage() {
         </div>
       </header>
 
+      {/* Filtro por tipo de cita */}
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 14 }}>
+        {TIPOS.map(t => (
+          <button key={t.key} onClick={() => setTipo(t.key)} style={{ padding: "6px 11px", fontSize: 11.5, fontWeight: 700, borderRadius: 8, border: tipo === t.key ? `1px solid ${t.c}` : "1px solid rgba(0,0,0,0.1)", background: tipo === t.key ? t.c : "#fff", color: tipo === t.key ? "#fff" : "#475569", cursor: "pointer", whiteSpace: "nowrap" }}>{t.label}</button>
+        ))}
+      </div>
+
       {loading && <div style={{ padding: 30, textAlign: "center", color: "#888" }}>Cargando…</div>}
-      {!loading && data.length === 0 && <div style={{ padding: 30, background: "#fff", borderRadius: 12, color: "#888", fontSize: 13, textAlign: "center" }}>Sin citas en este rango.</div>}
+      {!loading && visible.length === 0 && <div style={{ padding: 30, background: "#fff", borderRadius: 12, color: "#888", fontSize: 13, textAlign: "center" }}>Sin citas de este tipo en el rango.</div>}
 
       {Array.from(grouped.entries()).map(([day, ss]) => (
         <section key={day} style={{ marginBottom: 18 }}>
