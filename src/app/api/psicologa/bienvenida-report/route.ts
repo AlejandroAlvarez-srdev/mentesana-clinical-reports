@@ -11,7 +11,7 @@ const sb = createClient(process.env.NEXT_PUBLIC_BLOG_SUPABASE_URL!, process.env.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const VALID: AnguloBienvenida[] = ["burnout", "autoestima", "duelo", "limites", "ansiedad"];
+const VALID: AnguloBienvenida[] = ["burnout", "autoestima", "duelo", "limites", "ansiedad", "general"];
 type RespItem = { pregunta_idx: number; opciones_elegidas: number[]; texto?: string | null };
 
 const SELECT = "appointment_id, angulo, angulo_reclasifica, email, name, phone, respuestas, motivo_asistir, expectativa, report_url, report_generated, created_at";
