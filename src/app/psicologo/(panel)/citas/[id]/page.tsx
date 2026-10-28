@@ -12,7 +12,6 @@ import MeetLinkWithCCReminder from "../../../_components/MeetLinkWithCCReminder"
 import Link from "next/link";
 import { B2BCitaBadge } from "@/components/B2BCitaBadge";
 import type { B2BProgramaPublic } from "@/lib/b2b-programas";
-import LogopediaIntake from "@/components/logopedia/LogopediaIntake";
 
 const PURPLE = "#6A178C";
 
@@ -140,7 +139,6 @@ export default function CitaDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div>
       <Link href="/psicologo/citas" style={{ color: PURPLE, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>← Volver a citas</Link>
-      {appt.service_name?.startsWith("Logopedia") && <LogopediaIntake appointmentId={id} />}
 
       {/* Hero: si es cita B2B (Kairos, Cerebro de Líder, Integria…) el gradiente
           usa los colores del programa para que la psi vea al instante que NO
