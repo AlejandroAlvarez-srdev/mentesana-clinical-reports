@@ -3,6 +3,7 @@
 <p align="center"><img src="https://img.shields.io/badge/Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 16"> <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"> <img src="https://img.shields.io/badge/Claude-D97757?style=for-the-badge&logo=anthropic&logoColor=white" alt="Claude"> <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"> <img src="https://img.shields.io/badge/112_commits-6a178c?style=for-the-badge" alt="112 commits"></p>
 
 <h1 align="center">Clinical Reports &amp; Psychologist Portal</h1>
+<p align="center"><sub>Extracted from the private Mente Sana production monorepo with its real commit history: <b>113 commits, May 2026 – Nov 2026</b>. Secrets and personal data were removed before publishing.</sub></p>
 <!-- /header -->
 
 **The clinical back office of an online psychology clinic: a portal where licensed psychologists keep clinical histories and run their caseload, plus two paid patient documents (an LLM-drafted session summary and an attendance certificate) that are generated automatically and never sent without a human check.**
